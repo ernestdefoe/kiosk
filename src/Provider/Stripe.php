@@ -9,6 +9,7 @@ use Ernestdefoe\Kiosk\Model\Product;
 use Ernestdefoe\Kiosk\Model\Purchase;
 use Ernestdefoe\Kiosk\Service\Fulfilment;
 use Flarum\Foundation\ValidationException;
+use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\User\User;
 use Illuminate\Database\ConnectionInterface;
@@ -36,6 +37,7 @@ class Stripe implements Provider, WebhookProvider
         private ConnectionInterface $db,
         private TranslatorInterface $translator,
         private LoggerInterface $log,
+        private SettingsRepositoryInterface $settings,
     ) {
     }
 
@@ -80,6 +82,13 @@ class Stripe implements Provider, WebhookProvider
             'customer_email' => $user?->email,
         ];
 
+        // Stripe Tax, when the owner turned it on: Stripe works out and adds
+        // the tax for the buyer's address. Kiosk still asks for its price.
+        if ($this->settings->get('ernestdefoe-kiosk.stripe_tax')) {
+            $params['automatic_tax'] = ['enabled' => true];
+            $params['billing_address_collection'] = 'required';
+        }
+
         if ($recurring) {
             $params['subscription_data'] = ['metadata' => ['kiosk_number' => $purchase->number]]
                 + ($price->trial_days > 0 ? ['trial_period_days' => $price->trial_days] : []);
@@ -116,6 +125,7 @@ class Stripe implements Provider, WebhookProvider
         return ['quantity' => 1, 'price_data' => array_filter([
             'currency' => strtolower($purchase->currency),
             'unit_amount' => $purchase->amount_cents,
+            'tax_behavior' => 'exclusive',
             'product_data' => ['name' => mb_substr($purchase->product_name, 0, 250)],
             'recurring' => $price->isRecurring() ? ['interval' => $price->interval, 'interval_count' => $price->interval_count] : null,
         ])];
@@ -138,6 +148,8 @@ class Stripe implements Provider, WebhookProvider
         $made = $this->api->call('POST', '/v1/prices', array_filter([
             'currency' => strtolower($price->currency),
             'unit_amount' => $price->amount_cents,
+            // 🚨 Stripe Tax needs it set, and it can't change once a price is used.
+            'tax_behavior' => 'exclusive',
             'product_data' => ['name' => mb_substr($product->name, 0, 250), 'metadata' => ['kiosk_product_id' => (string) $product->id]],
             'recurring' => $price->isRecurring() ? ['interval' => $price->interval, 'interval_count' => $price->interval_count] : null,
             'metadata' => ['kiosk_price_id' => (string) $price->id],
@@ -200,14 +212,15 @@ class Stripe implements Provider, WebhookProvider
             return;
         }
 
-        if ((int) ($session['amount_total'] ?? -1) !== $purchase->amount_cents || strcasecmp((string) ($session['currency'] ?? ''), $purchase->currency) !== 0) {
+        // Before tax: Stripe Tax adds to the total, never to what we charge.
+        if ((int) ($session['amount_subtotal'] ?? $session['amount_total'] ?? -1) !== $purchase->amount_cents || strcasecmp((string) ($session['currency'] ?? ''), $purchase->currency) !== 0) {
             $this->log->error('[kiosk] Stripe session amount does not match purchase '.$purchase->number.': '.($session['amount_total'] ?? '?').' '.($session['currency'] ?? '?'));
 
             return;
         }
 
         $intent = $session['payment_intent'] ?? null;
-        $this->fulfilment->recordPayment($purchase, (string) (is_array($intent) ? $intent['id'] : ($intent ?: $session['id'])), $purchase->amount_cents, $purchase->currency);
+        $this->fulfilment->recordPayment($purchase, (string) (is_array($intent) ? $intent['id'] : ($intent ?: $session['id'])), (int) ($session['amount_total'] ?? $purchase->amount_cents), $purchase->currency);
 
         $now = Carbon::now();
         $this->fulfilment->activate($purchase, $now, $purchase->periodEndFrom($now));

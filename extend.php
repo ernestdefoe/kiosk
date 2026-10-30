@@ -176,6 +176,7 @@ return [
 
     (new Extend\Console())
         ->command(SweepCommand::class)
+        ->command(\Ernestdefoe\Kiosk\Console\ImportFloxumCommand::class)
         ->schedule(SweepCommand::class, function (\Illuminate\Console\Scheduling\Event $event): void {
             $event->everyTenMinutes()->withoutOverlapping();
         }),

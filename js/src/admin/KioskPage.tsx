@@ -810,6 +810,12 @@ export default class KioskPage extends ExtensionPage {
           help: t('admin.settings.terms_url_help'),
         })}
         {this.buildSettingComponent({ setting: 'ernestdefoe-kiosk.show_nav', type: 'boolean', label: t('admin.settings.show_nav') })}
+        {this.buildSettingComponent({
+          setting: 'ernestdefoe-kiosk.stripe_tax',
+          type: 'boolean',
+          label: t('admin.settings.stripe_tax'),
+          help: t('admin.settings.stripe_tax_help'),
+        })}
         {this.submitButton()}
       </div>
     );

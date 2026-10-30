@@ -91,6 +91,11 @@ class Gate
 
         $locked = $this->lockedTagIds($actor);
 
+        // One discussion bought on its own opens even inside a paid tag.
+        if ($locked !== [] && in_array($discussionId, $this->access->ids($actor, 'discussion'), true)) {
+            return false;
+        }
+
         return $locked !== [] && array_intersect($this->tagsOf($discussionId), $locked) !== [];
     }
 

@@ -17,12 +17,28 @@ class FakeStripe
     public int $periodEnd = 0;
     public bool $cancelAtPeriodEnd = false;
 
+    /** Overrides by "METHOD /path" (exact): the body to answer. @var array<string, array<string, mixed>> */
+    public array $answers = [];
+
+    /** Answers list calls by query: fn (path, params) => rows, or null to fall through. @var (callable(string, array<string, mixed>): ?array)|null */
+    public $lister = null;
+
+    public ?int $subtotal = null;
+
     public function __invoke(RequestInterface $request): Response
     {
         $method = $request->getMethod();
         $path = $request->getUri()->getPath();
         parse_str($method === 'GET' ? $request->getUri()->getQuery() : (string) $request->getBody(), $params);
         $this->calls[] = ['method' => $method, 'path' => $path, 'params' => $params, 'headers' => $request->getHeaders()];
+
+        if ($method === 'GET' && $this->lister && ($rows = ($this->lister)($path, $params)) !== null) {
+            return $this->json(['data' => $rows, 'has_more' => false]);
+        }
+
+        if (isset($this->answers["$method $path"])) {
+            return $this->json($this->answers["$method $path"]);
+        }
 
         return match (true) {
             $path === '/v1/account' => $this->json(['id' => 'acct_1']),
@@ -47,7 +63,7 @@ class FakeStripe
     {
         return $this->subscriptionMode
             ? ['id' => 'cs_test_1', 'status' => 'complete', 'mode' => 'subscription', 'client_reference_id' => null, 'subscription' => $this->subscription() + ['latest_invoice' => $this->invoice()]]
-            : ['id' => 'cs_test_1', 'status' => 'complete', 'mode' => 'payment', 'payment_status' => $this->paymentStatus, 'amount_total' => $this->amountTotal, 'currency' => 'usd', 'payment_intent' => 'pi_1'];
+            : ['id' => 'cs_test_1', 'status' => 'complete', 'mode' => 'payment', 'payment_status' => $this->paymentStatus, 'amount_total' => $this->amountTotal, 'amount_subtotal' => $this->subtotal ?? $this->amountTotal, 'currency' => 'usd', 'payment_intent' => 'pi_1'];
     }
 
     /** @return array<string, mixed> */

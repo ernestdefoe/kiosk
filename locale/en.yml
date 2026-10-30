@@ -376,6 +376,8 @@ ernestdefoe-kiosk:
       terms_url: Terms of sale page
       terms_url_help: If set, buyers must agree to it before paying.
       show_nav: Show Store in the sidebar
+      stripe_tax: Let Stripe add sales tax (Stripe Tax)
+      stripe_tax_help: "For Stripe checkouts only. Turn on Stripe Tax in your Stripe dashboard first: Stripe then asks buyers for their address and adds the tax on top of your price. Kiosk doesn't work out tax itself; that's up to you."
     errors:
       name: Give the product a name (up to 150 characters).
       unlock_type: Something in "What buying it unlocks" can't be sold on this forum.
