@@ -6,6 +6,8 @@ Sell memberships, premium tags, single discussions, posting passes, bumps and ti
 
 Kiosk is free and MIT-licensed. You choose what is for sale; tax is up to you.
 
+![A paid discussion seen from outside: its opening words, faded, and how to get the rest](screenshots/teaser-discussion.jpg)
+
 ## What you can sell
 
 Every product unlocks one or more things, and has one or more prices.
@@ -42,6 +44,24 @@ A price can also be a **team plan**: give it more than one seat, and the buyer h
 - **Grace days**: a renewal that is a day or two late doesn't lock a paying member out.
 - **Moving from floxum/payments**: `php flarum kiosk:import-floxum` (see below).
 - Translatable, works in light and dark mode, and adds about 7 KB (gzipped) to the JavaScript every page loads. The store pages load only when opened.
+
+## Screenshots
+
+| The store | A paid section as a teaser |
+| --- | --- |
+| ![The store](screenshots/store.jpg) | ![A teaser tag](screenshots/teaser-tag.jpg) |
+
+| A coupon on a product | My purchases, with a team plan's seats |
+| --- | --- |
+| ![A product card with a coupon applied](screenshots/card-coupon.jpg) | ![My purchases](screenshots/purchases.jpg) |
+
+| The admin's setup checklist | Coupons |
+| --- | --- |
+| ![The admin overview](screenshots/admin-overview.jpg) | ![The coupons tab](screenshots/admin-coupons.jpg) |
+
+| Products | Payment providers |
+| --- | --- |
+| ![The products tab](screenshots/admin-products.jpg) | ![The payments tab](screenshots/admin-payments.jpg) |
 
 ## Installation
 
