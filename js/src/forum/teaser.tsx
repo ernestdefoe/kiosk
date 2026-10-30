@@ -14,6 +14,12 @@ import LockedNotice from './components/LockedNotice';
  * underneath, and marks the discussion with a lock in lists.
  */
 export default function teaser() {
+  // 🚨 A post only redraws when its data changes: without this, the offer
+  // inside the teaser stays a loading spinner after it has loaded.
+  extend(CommentPost.prototype, 'oninit', function (this: CommentPost) {
+    if (this.attrs.post.attribute('kioskLocked')) this.subtree.check(() => LockedNotice.loads);
+  });
+
   extend(CommentPost.prototype, 'classes', function (this: CommentPost, classes: string[]) {
     if (this.attrs.post.attribute('kioskLocked')) classes.push('KioskTeaserPost');
   });

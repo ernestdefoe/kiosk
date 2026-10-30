@@ -30,6 +30,13 @@ export interface LockedNoticeAttrs extends ComponentAttrs {
  * renders nothing at all when none do, so it is safe to drop in anywhere.
  */
 export default class LockedNotice extends Component<LockedNoticeAttrs> {
+  /**
+   * Goes up each time a notice finishes loading. A post keeps its rendered
+   * output until its data changes, so a notice inside one (the teaser) only
+   * shows once the post is told to look at this (see teaser.tsx).
+   */
+  static loads = 0;
+
   products: Product[] | null = null;
   meta: StoreMeta | null = null;
 
@@ -39,10 +46,12 @@ export default class LockedNotice extends Component<LockedNoticeAttrs> {
       ({ data, meta }) => {
         this.products = data;
         this.meta = meta;
+        LockedNotice.loads++;
         m.redraw();
       },
       () => {
         this.products = [];
+        LockedNotice.loads++;
         m.redraw();
       }
     );
