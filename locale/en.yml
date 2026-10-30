@@ -52,6 +52,14 @@ ernestdefoe-kiosk:
       login_to_buy: Log in to buy
       owned: You have this
       your_amount: "Your amount"
+      seats: "{count, plural, other {for # people}}"
+      coupon: Have a coupon?
+      coupon_label: Coupon code
+      apply: Apply
+      coupon_total: "With this code you pay {amount}."
+      gift: Give as a gift
+      gift_label: Their username
+      buy_gift: Buy as a gift
       refusal:
         unavailable: Not on sale right now.
         sold_out: Sold out.
@@ -104,11 +112,24 @@ ernestdefoe-kiosk:
       number: "Reference: {number}"
       cancel: Stop renewing
       cancel_confirm: "Stop renewing? You keep access until {date}, and you won't be charged again."
+      gift_from: "A gift from {name}"
+      gave_to: "You gave this to {name}"
+      seat_from: "A seat on {name}'s plan"
+      seats_used: "{used} of {count} seats used (yours included)"
+      add_seat_label: Username
+      add_seat: Give a seat
+      remove_seat: "Take back {name}'s seat"
+      switch_label: Switch plan
+      switch: Switch plan
+      switch_confirm_stripe: "Switch to this plan? It starts now, and the difference is settled on your next bill."
+      switch_confirm_paypal: "Switch to this plan? PayPal asks you to approve it, and your next bill is at the new price."
     notifications:
       receipt: Your purchase of {product} is complete
       payment_failed: Your payment for {product} didn't go through
       reminder: "{product} renews in a few days"
       ended: Your access to {product} has ended
+      gift: "{product} was given to you as a gift"
+      seat: You were given a seat on {product}
     settings:
       notify: Receipts and renewal updates for my purchases
     errors:
@@ -126,6 +147,13 @@ ernestdefoe-kiosk:
       no_bumps: You have no bumps left for this discussion.
       provider_unreachable: We couldn't reach the payment provider. Try again in a moment.
       provider_refused: The payment provider couldn't start the payment. The forum's admin has been told.
+      coupon: That code isn't valid for this.
+      no_such_user: There's no member with that username.
+      no_gift: This can't be given as a gift.
+      no_seats: This purchase has no seats to give.
+      seat_taken: That member already has a seat.
+      seats_full: Every seat is taken. Remove someone first.
+      cannot_switch: You can't switch to that plan.
 
   admin:
     permissions:
@@ -134,9 +162,24 @@ ernestdefoe-kiosk:
       overview: Overview
       products: Products
       purchases: Purchases
+      coupons: Coupons
       payments: Payments
       webhooks: Payment log
       settings: Settings
+    coupons:
+      code: Code
+      discount: Discount
+      product: For
+      all_products: Every product
+      max_uses: Uses allowed
+      unlimited: Unlimited
+      expires: Ends
+      create: Add coupon
+      used: Used
+      empty: No coupons yet.
+      delete: Delete coupon
+      delete_confirm: "Delete {code}? Purchases already made with it keep their price."
+      help: "Buyers enter the code on a product's card. On a subscription the discount applies to every renewal. A code that makes a subscription free is refused; a one-time purchase can be free."
     setup:
       title: Set up your store
       intro: Four steps. Each one turns green when it's done.
@@ -218,6 +261,8 @@ ernestdefoe-kiosk:
       trial: free trial
       for: for
       days: days
+      seats: People
+      seats_help: "More than 1 makes it a team plan: the buyer gives the other seats to members."
       kind:
         recurring: Renews
         one_off: One-time, forever
@@ -351,6 +396,9 @@ ernestdefoe-kiosk:
       nothing_to_refund: There's no payment to refund.
       refund_failed: The payment provider didn't accept the refund. Check the payment there.
       stripe_key: "That isn't a Stripe secret key. It starts with sk_test_ or sk_live_."
+      coupon_code: "A code is 3 to 40 letters, numbers, dashes or underscores."
+      coupon_taken: That code is already in use.
+      coupon_value: Enter a discount from 1 to 100 percent, or an amount above zero.
 
   # Emails. {url} links to the member's purchases.
   email:
@@ -372,6 +420,18 @@ ernestdefoe-kiosk:
         A heads-up: **{product}** renews on {until} for {amount}.
 
         Nothing to do if you want to keep it. To stop it renewing: {url}
+    gift:
+      subject: "{product} is yours, as a gift"
+      body: |
+        Someone gave you **{product}**. It's ready now. Reference: {number}
+
+        See what you have: {url}
+    seat:
+      subject: You have a seat on {product}
+      body: |
+        You were given a seat on **{product}**. Everything it includes is open to you now.
+
+        See what you have: {url}
     ended:
       subject: Your access to {product} has ended
       body: |

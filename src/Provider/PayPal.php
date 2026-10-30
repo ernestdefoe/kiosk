@@ -107,9 +107,14 @@ class PayPal implements Provider, WebhookProvider
     {
         $plan = $this->plan($price, $product);
 
-        $body = $this->api->call('POST', '/v1/billing/subscriptions', [
+        $body = $this->api->call('POST', '/v1/billing/subscriptions', array_filter([
             'plan_id' => $plan,
             'custom_id' => $purchase->number,
+            // A coupon: the same plan at the discounted price, every cycle.
+            'plan' => $purchase->amount_cents === $price->amount_cents ? null : ['billing_cycles' => [[
+                'sequence' => $price->trial_days > 0 ? 2 : 1,
+                'pricing_scheme' => ['fixed_price' => ['value' => Money::toDecimal($purchase->amount_cents, $purchase->currency), 'currency_code' => $purchase->currency]],
+            ]]],
             'application_context' => [
                 'brand_name' => $this->brand(),
                 'shipping_preference' => 'NO_SHIPPING',
@@ -117,7 +122,7 @@ class PayPal implements Provider, WebhookProvider
                 'return_url' => $returnUrl,
                 'cancel_url' => $cancelUrl,
             ],
-        ], 'kiosk-'.$purchase->number);
+        ], fn ($v) => $v !== null), 'kiosk-'.$purchase->number);
 
         return $this->started($purchase, $body);
     }
@@ -154,7 +159,15 @@ class PayPal implements Provider, WebhookProvider
             return (string) $existing;
         }
 
-        $catalog = $this->api->call('POST', '/v1/catalogs/products', [
+        // 🚨 PayPal only revises between plans of ONE catalog product, so a
+        // product's prices share the catalog product its first plan made.
+        $sibling = $this->db->table('kiosk_price_refs')
+            ->join('kiosk_prices', 'kiosk_prices.id', '=', 'kiosk_price_refs.price_id')
+            ->where(['kiosk_prices.product_id' => $product->id, 'kiosk_price_refs.provider' => 'paypal', 'kiosk_price_refs.mode' => $mode])
+            ->value('kiosk_price_refs.external_id');
+        $known = $sibling ? ($this->api->call('GET', '/v1/billing/plans/'.rawurlencode((string) $sibling))['product_id'] ?? null) : null;
+
+        $catalog = $known ? ['id' => $known] : $this->api->call('POST', '/v1/catalogs/products', [
             'name' => mb_substr($product->name, 0, 127),
             'type' => 'DIGITAL',
         ], 'kiosk-product-'.$mode.'-'.$price->id);
@@ -287,6 +300,10 @@ class PayPal implements Provider, WebhookProvider
         $status = (string) ($sub['status'] ?? '');
         $next = isset($sub['billing_info']['next_billing_time']) ? Carbon::parse($sub['billing_info']['next_billing_time']) : null;
 
+        if ($status === 'ACTIVE' && $purchase->status !== Purchase::PENDING && ($to = $this->priceOfPlan($purchase, $sub['plan_id'] ?? null))) {
+            $this->fulfilment->switchPrice($purchase, $to);
+        }
+
         if ($status === 'ACTIVE') {
             $start = isset($sub['start_time']) ? Carbon::parse($sub['start_time']) : Carbon::now();
             // No next billing time means PayPal has not scheduled one yet;
@@ -359,6 +376,7 @@ class PayPal implements Provider, WebhookProvider
                 break;
 
             case 'BILLING.SUBSCRIPTION.ACTIVATED':
+            case 'BILLING.SUBSCRIPTION.UPDATED':
             case 'BILLING.SUBSCRIPTION.CANCELLED':
             case 'BILLING.SUBSCRIPTION.EXPIRED':
                 if ($purchase = $this->bySubscription($r)) {
@@ -492,6 +510,41 @@ class PayPal implements Provider, WebhookProvider
         );
 
         return $body !== null && ($body['_status'] ?? 500) < 300;
+    }
+
+    /**
+     * PayPal revises the subscription to the new plan once the buyer approves
+     * it there. The change lands when PayPal reports the new plan (the return
+     * page or BILLING.SUBSCRIPTION.UPDATED), never before.
+     */
+    public function switchPlan(Purchase $purchase, Price $to, string $returnUrl): ?string
+    {
+        $body = $this->api->call('POST', '/v1/billing/subscriptions/'.rawurlencode((string) $purchase->provider_ref).'/revise', [
+            'plan_id' => $this->plan($to, $to->product ?? Product::query()->findOrFail($to->product_id)),
+            'application_context' => [
+                'brand_name' => $this->brand(),
+                'shipping_preference' => 'NO_SHIPPING',
+                'user_action' => 'CONTINUE',
+                'return_url' => $returnUrl,
+                'cancel_url' => $returnUrl,
+            ],
+        ], null, $purchase->mode);
+
+        $link = $body ? PayPalClient::approveLink($body) : null;
+
+        if (! $link) {
+            throw new ValidationException(['purchase' => $this->translator->trans($body === null ? 'ernestdefoe-kiosk.forum.errors.provider_unreachable' : 'ernestdefoe-kiosk.forum.errors.provider_refused')]);
+        }
+
+        return $link;
+    }
+
+    /** The Kiosk price a PayPal plan id was made for, in this purchase's mode. */
+    private function priceOfPlan(Purchase $purchase, mixed $planId): ?Price
+    {
+        $id = $planId ? $this->db->table('kiosk_price_refs')->where(['provider' => 'paypal', 'mode' => $purchase->mode, 'external_id' => (string) $planId])->value('price_id') : null;
+
+        return $id ? Price::query()->find($id) : null;
     }
 
     private function brand(): string

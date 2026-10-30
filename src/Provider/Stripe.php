@@ -67,7 +67,7 @@ class Stripe implements Provider, WebhookProvider
     public function checkout(Purchase $purchase, Price $price, Product $product, string $returnUrl, string $cancelUrl): string
     {
         $recurring = $price->isRecurring();
-        $user = $purchase->user ?? User::query()->find($purchase->user_id);
+        $user = User::query()->find($purchase->gifted_by ?? $purchase->user_id);
 
         $params = [
             'mode' => $recurring ? 'subscription' : 'payment',
@@ -279,6 +279,32 @@ class Stripe implements Provider, WebhookProvider
         } elseif (str_starts_with((string) $purchase->provider_ref, 'sub_')) {
             $this->syncSubscription($purchase);
         }
+    }
+
+    /** Stripe swaps the item's price and prorates the difference on the next invoice. */
+    public function switchPlan(Purchase $purchase, Price $to, string $returnUrl): ?string
+    {
+        $sub = $this->api->call('GET', '/v1/subscriptions/'.rawurlencode((string) $purchase->provider_ref), [], null, $purchase->mode);
+        $item = $sub['items']['data'][0]['id'] ?? null;
+
+        if (! $item) {
+            throw new ValidationException(['purchase' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.provider_unreachable')]);
+        }
+
+        $product = $to->product ?? Product::query()->findOrFail($to->product_id);
+        $done = $this->api->call('POST', '/v1/subscriptions/'.rawurlencode((string) $purchase->provider_ref), [
+            'items' => [['id' => $item, 'price' => $this->price($to, $product)]],
+            'proration_behavior' => 'create_prorations',
+            'metadata' => ['kiosk_number' => $purchase->number, 'kiosk_price_id' => (string) $to->id],
+        ], 'kiosk-switch-'.$purchase->number.'-'.$to->id, $purchase->mode);
+
+        if (! $done || ($done['_status'] ?? 500) >= 400) {
+            throw new ValidationException(['purchase' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.provider_refused')]);
+        }
+
+        $this->fulfilment->switchPrice($purchase, $to);
+
+        return null;
     }
 
     public function verify(array $headers, string $rawBody): bool

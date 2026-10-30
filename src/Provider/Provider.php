@@ -41,4 +41,11 @@ interface Provider
 
     /** Give a payment back in full. True if the provider agreed. */
     public function refund(Payment $payment): bool;
+
+    /**
+     * Move a subscription to another recurring price of the same product.
+     * Returns a URL when the buyer must approve the change at the provider,
+     * null when it is done. Throws a ValidationException when it can't.
+     */
+    public function switchPlan(Purchase $purchase, Price $to, string $returnUrl): ?string;
 }

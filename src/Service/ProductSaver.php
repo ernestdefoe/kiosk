@@ -123,7 +123,7 @@ class ProductSaver
             $existing = isset($data['id']) ? $current->get((int) $data['id']) : null;
 
             $candidate = $existing ? clone $existing : new Price();
-            foreach (['amount_cents', 'currency', 'kind', 'interval', 'interval_count', 'term_days', 'trial_days'] as $field) {
+            foreach (['amount_cents', 'currency', 'kind', 'interval', 'interval_count', 'term_days', 'trial_days', 'seats'] as $field) {
                 $candidate->{$field} = $data[$field];
             }
 
@@ -137,7 +137,7 @@ class ProductSaver
             if ($existing && ! Purchase::query()->where('price_id', $existing->id)->exists()) {
                 // Nobody has bought it yet: an edit is just an edit, and the
                 // provider plan made for the old terms is forgotten.
-                foreach (['amount_cents', 'currency', 'kind', 'interval', 'interval_count', 'term_days', 'trial_days'] as $field) {
+                foreach (['amount_cents', 'currency', 'kind', 'interval', 'interval_count', 'term_days', 'trial_days', 'seats'] as $field) {
                     $existing->{$field} = $data[$field];
                 }
                 $existing->position = $position;
@@ -149,7 +149,7 @@ class ProductSaver
 
             $price = new Price();
             $price->product_id = $product->id;
-            foreach (['amount_cents', 'currency', 'kind', 'interval', 'interval_count', 'term_days', 'trial_days'] as $field) {
+            foreach (['amount_cents', 'currency', 'kind', 'interval', 'interval_count', 'term_days', 'trial_days', 'seats'] as $field) {
                 $price->{$field} = $data[$field];
             }
             $price->position = $position;
@@ -248,6 +248,8 @@ class ProductSaver
                 'interval_count' => $count,
                 'term_days' => $term,
                 'trial_days' => $trial,
+                // A team plan: the buyer gives the other seats to members.
+                'seats' => $kind === Price::CUSTOM ? 1 : min(1000, max(1, (int) Arr::get($price, 'seats', 1))),
             ];
         }
 

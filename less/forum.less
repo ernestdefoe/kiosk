@@ -341,3 +341,76 @@ span.KioskChip,
     grid-template-columns: 1fr;
   }
 }
+
+// Coupon, gift, seats and plan switching: one small field under a price.
+.KioskCard-extras {
+  margin-bottom: 10px;
+}
+.KioskCard-extraLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+.KioskCard .KioskCard-extraLink,
+.KioskPurchases .KioskCard-extraLink {
+  padding: 0;
+  font-size: 0.9em;
+  color: var(--muted-color);
+}
+.KioskCard-field {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+
+  .FormControl {
+    flex: 1;
+    min-width: 0;
+  }
+  .Button {
+    flex-shrink: 0;
+  }
+}
+.KioskCard-note {
+  margin: 6px 0 0;
+  font-size: 0.9em;
+  color: var(--text-color);
+
+  &--error {
+    color: var(--alert-error-color, #d83e3e);
+  }
+}
+.KioskPurchase-whose {
+  margin: 4px 0 0;
+  font-size: 0.9em;
+  color: var(--muted-color);
+}
+.KioskPurchase-seats {
+  margin-top: 12px;
+  color: var(--text-color);
+}
+.KioskPurchase-seatsHead {
+  margin: 0 0 4px;
+  font-weight: 600;
+}
+.KioskPurchase-seatList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-width: 0;
+
+    span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  }
+}
+.KioskPurchase-switch {
+  margin-top: 12px;
+}

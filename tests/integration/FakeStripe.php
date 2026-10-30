@@ -59,6 +59,7 @@ class FakeStripe
             'current_period_start' => time(),
             'current_period_end' => $this->periodEnd ?: strtotime('+1 month'),
             'cancel_at_period_end' => $this->cancelAtPeriodEnd,
+            'items' => ['data' => [['id' => 'si_1']]],
             'metadata' => [],
         ];
     }

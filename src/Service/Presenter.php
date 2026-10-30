@@ -9,6 +9,7 @@ use Ernestdefoe\Kiosk\Model\Purchase;
 use Ernestdefoe\Kiosk\Unlock\Registry;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\User\User;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Collection;
 
 /**
@@ -20,7 +21,7 @@ use Illuminate\Support\Collection;
  */
 class Presenter
 {
-    public function __construct(private Registry $types, private TranslatorInterface $translator)
+    public function __construct(private Registry $types, private TranslatorInterface $translator, private ConnectionInterface $db)
     {
     }
 
@@ -77,6 +78,7 @@ class Presenter
             'intervalCount' => $price->interval_count,
             'termDays' => $price->term_days,
             'trialDays' => $price->trial_days,
+            'seats' => max(1, (int) $price->seats),
         ];
     }
 
@@ -84,13 +86,32 @@ class Presenter
      * @param iterable<Purchase> $purchases with entitlements loaded
      * @return list<array<string, mixed>>
      */
-    public function purchases(iterable $purchases, bool $admin = false): array
+    public function purchases(iterable $purchases, bool $admin = false, ?User $viewer = null): array
     {
         $purchases = Collection::make($purchases);
+
+        // Seat holders, and the people on either side of a gift: two queries
+        // for the whole list.
+        $seats = $purchases->contains(fn (Purchase $p) => $p->seats > 1)
+            ? $this->db->table('kiosk_seats')->whereIn('purchase_id', $purchases->pluck('id'))->orderBy('added_at')->get()->groupBy('purchase_id')
+            : Collection::make();
+        $ids = $seats->flatten()->pluck('user_id')
+            ->merge($purchases->pluck('gifted_by')->filter())
+            ->merge($purchases->filter(fn (Purchase $p) => $p->gifted_by || ($viewer && $p->user_id !== (int) $viewer->id))->pluck('user_id'))->unique()->values();
+        $people = $ids->isEmpty() ? Collection::make() : User::query()->whereIn('id', $ids)->get(['id', 'username', 'display_name'])->keyBy('id');
+        $person = fn ($id) => ($u = $people->get($id)) ? ['id' => (int) $u->id, 'username' => (string) $u->username, 'displayName' => (string) $u->display_name] : null;
         $names = $this->names($purchases->flatMap(fn (Purchase $p) => $p->entitlements->map(fn (Entitlement $e) => [$e->type, $e->target_id])));
 
         return $purchases->map(fn (Purchase $p) => [
             'id' => $p->id,
+            'priceId' => $p->price_id,
+            'role' => ! $viewer || $p->user_id === (int) $viewer->id ? 'owner' : ($p->gifted_by === (int) $viewer->id ? 'giver' : 'seat'),
+            'giftedBy' => $p->gifted_by ? $person($p->gifted_by) : null,
+            'giftedTo' => $p->gifted_by ? $person($p->user_id) : null,
+            'owner' => $viewer && $p->user_id !== (int) $viewer->id ? $person($p->user_id) : null,
+            'couponCode' => $p->coupon_code,
+            'seats' => $p->seats,
+            'seatHolders' => $seats->get($p->id, Collection::make())->map(fn ($s) => $person((int) $s->user_id))->filter()->values()->all(),
             'number' => $p->number,
             'productId' => $p->product_id,
             'productName' => $p->product_name,
@@ -110,7 +131,7 @@ class Presenter
             'createdAt' => $p->created_at?->toIso8601String(),
             'paidAt' => $p->paid_at?->toIso8601String(),
             'canCancel' => $p->isRecurring() && $p->status === Purchase::ACTIVE && $p->provider !== Purchase::GRANT,
-            'unlocks' => $p->entitlements->map(fn (Entitlement $e) => [
+            'unlocks' => $p->entitlements->where('user_id', $p->user_id)->map(fn (Entitlement $e) => [
                 'type' => $e->type,
                 'targetId' => $e->target_id,
                 'label' => $names[$e->type][$e->target_id]['label'] ?? null,

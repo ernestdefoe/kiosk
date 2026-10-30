@@ -12,6 +12,7 @@ export interface Price {
   intervalCount: number;
   termDays: number | null;
   trialDays: number;
+  seats: number;
 }
 
 export interface Unlock {
@@ -76,12 +77,28 @@ export interface Purchase {
   createdAt: string;
   paidAt: string | null;
   canCancel: boolean;
+  priceId: number | null;
+  /** owner: theirs; giver: a gift they gave; seat: a team seat they were given. */
+  role: 'owner' | 'giver' | 'seat';
+  giftedBy: Person | null;
+  giftedTo: Person | null;
+  /** Who holds it, when that isn't the viewer. */
+  owner: Person | null;
+  couponCode: string | null;
+  seats: number;
+  seatHolders: Person[];
   unlocks: Unlock[];
   payments: Payment[];
   // Admin only:
   note?: string | null;
   providerRef?: string | null;
   user?: { id: number; username: string; displayName: string; avatarUrl: string | null; email: string } | null;
+}
+
+export interface Person {
+  id: number;
+  username: string;
+  displayName: string;
 }
 
 export interface StoreMeta {
@@ -116,3 +133,9 @@ export const myPurchases = () => call<{ data: Purchase[] }>('GET', '/purchases')
 export const purchase = (number: string) => call<{ data: Purchase }>('GET', `/purchases/${number}`);
 export const confirm = (number: string) => call<{ data: Purchase }>('POST', `/purchases/${number}/confirm`);
 export const cancel = (number: string) => call<{ data: Purchase }>('POST', `/purchases/${number}/cancel`);
+export const switchPlan = (number: string, priceId: number) =>
+  call<{ data: Purchase | { url: string } }>('POST', `/purchases/${number}/switch`, { priceId });
+export const addSeat = (number: string, username: string) => call<{ data: Purchase }>('POST', `/purchases/${number}/seats`, { username });
+export const removeSeat = (number: string, userId: number) => call<{ data: Purchase }>('DELETE', `/purchases/${number}/seats/${userId}`);
+export const checkCoupon = (priceId: number, code: string) =>
+  call<{ data: { amountCents: number; currency: string } }>('POST', '/coupons/check', { priceId, code });

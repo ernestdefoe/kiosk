@@ -138,6 +138,10 @@ return [
         ->get('/kiosk/purchases/{number}', 'kiosk.purchases.show', Api\PurchaseController::class)
         ->post('/kiosk/purchases/{number}/confirm', 'kiosk.purchases.confirm', Api\PurchaseController::class)
         ->post('/kiosk/purchases/{number}/cancel', 'kiosk.purchases.cancel', Api\PurchaseController::class)
+        ->post('/kiosk/purchases/{number}/switch', 'kiosk.purchases.switch', Api\PurchaseController::class)
+        ->post('/kiosk/purchases/{number}/seats', 'kiosk.purchases.seats.add', Api\PurchaseController::class)
+        ->delete('/kiosk/purchases/{number}/seats/{userId:[0-9]+}', 'kiosk.purchases.seats.remove', Api\PurchaseController::class)
+        ->post('/kiosk/coupons/check', 'kiosk.coupons.check', Api\CouponController::class)
         ->post('/kiosk/webhooks/{provider:[a-z]+}', 'kiosk.webhooks', Api\WebhookController::class)
         ->post('/kiosk/discussions/{id:[0-9]+}/bump', 'kiosk.discussions.bump', Api\ActionsController::class)
         ->get('/kiosk/discussions/{id:[0-9]+}/tips', 'kiosk.discussions.tips', Api\ActionsController::class)
@@ -155,6 +159,9 @@ return [
         ->post('/kiosk/admin/grants', 'kiosk.admin.grants', Api\Admin\PurchasesController::class)
         ->get('/kiosk/admin/webhooks', 'kiosk.admin.webhooks', Api\Admin\WebhooksController::class)
         ->post('/kiosk/admin/webhooks/{id:[0-9]+}/replay', 'kiosk.admin.webhooks.replay', Api\Admin\WebhooksController::class)
+        ->get('/kiosk/admin/coupons', 'kiosk.admin.coupons', Api\Admin\CouponsController::class)
+        ->post('/kiosk/admin/coupons', 'kiosk.admin.coupons.create', Api\Admin\CouponsController::class)
+        ->delete('/kiosk/admin/coupons/{id:[0-9]+}', 'kiosk.admin.coupons.delete', Api\Admin\CouponsController::class)
         ->post('/kiosk/admin/paypal', 'kiosk.admin.paypal', Api\Admin\PayPalController::class)
         ->post('/kiosk/admin/stripe', 'kiosk.admin.stripe', Api\Admin\StripeController::class),
 

@@ -14,11 +14,12 @@ import * as api from './api';
 import type { Overview, PayPalStatus, StripeStatus, WebhookRow } from './api';
 import ProductModal from './ProductModal';
 import GrantModal from './GrantModal';
+import CouponsTab from './CouponsTab';
 import Sortable from './sortable';
 import { TEMPLATES } from './templates';
 
-type Tab = 'overview' | 'products' | 'purchases' | 'payments' | 'webhooks' | 'settings';
-const TABS: Tab[] = ['overview', 'products', 'purchases', 'payments', 'webhooks', 'settings'];
+type Tab = 'overview' | 'products' | 'purchases' | 'coupons' | 'payments' | 'webhooks' | 'settings';
+const TABS: Tab[] = ['overview', 'products', 'purchases', 'coupons', 'payments', 'webhooks', 'settings'];
 
 const PAYPAL_APPS = 'https://developer.paypal.com/dashboard/applications';
 const STRIPE_KEYS = 'https://dashboard.stripe.com/apikeys';
@@ -73,7 +74,7 @@ export default class KioskPage extends ExtensionPage {
   }
 
   loadTab() {
-    if (this.tab === 'products' || this.tab === 'overview') this.loadProducts();
+    if (this.tab === 'products' || this.tab === 'overview' || this.tab === 'coupons') this.loadProducts();
     if (this.tab === 'purchases') this.loadPurchases();
     if (this.tab === 'webhooks') this.loadWebhooks();
   }
@@ -136,6 +137,8 @@ export default class KioskPage extends ExtensionPage {
         return this.productsTab();
       case 'purchases':
         return this.purchasesTab();
+      case 'coupons':
+        return <CouponsTab products={this.products} />;
       case 'payments':
         return this.paymentsTab();
       case 'webhooks':

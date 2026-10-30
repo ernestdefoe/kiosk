@@ -19,7 +19,7 @@ use Flarum\User\User;
  */
 class PurchaseBlueprint implements BlueprintInterface, AlertableInterface, MailableInterface
 {
-    public const KINDS = ['receipt', 'payment_failed', 'reminder', 'ended'];
+    public const KINDS = ['receipt', 'payment_failed', 'reminder', 'ended', 'gift', 'seat'];
 
     public function __construct(public Purchase $purchase, public string $kind)
     {

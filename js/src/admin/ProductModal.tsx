@@ -12,7 +12,7 @@ import type { Kind, Interval, Product } from '../common/api';
 import { saveProduct, searchUnlocks } from './api';
 import type { UnlockType } from './api';
 
-const CURRENCIES = [
+export const CURRENCIES = [
   'USD',
   'EUR',
   'GBP',
@@ -47,6 +47,7 @@ interface PriceRow {
   intervalCount: number;
   termDays: number;
   trialDays: number;
+  seats: number;
 }
 
 interface UnlockRow {
@@ -113,9 +114,21 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
           intervalCount: x.intervalCount,
           termDays: x.termDays || 30,
           trialDays: x.trialDays,
+          seats: x.seats || 1,
         }))
       : (preset.prices || [{}]).map(
-          (x) => ({ kind: 'recurring', amount: '5', currency, interval: 'month', intervalCount: 1, termDays: 30, trialDays: 0, ...x }) as PriceRow
+          (x) =>
+            ({
+              kind: 'recurring',
+              amount: '5',
+              currency,
+              interval: 'month',
+              intervalCount: 1,
+              termDays: 30,
+              trialDays: 0,
+              seats: 1,
+              ...x,
+            }) as PriceRow
         );
 
     this.pickType = preset.pickType || preset.unlocks?.[0]?.type || this.attrs.types[0]?.key || '';
@@ -462,6 +475,21 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
             <span>{t('admin.product.days')}</span>
           </div>
         ) : null}
+        {p.kind !== 'custom' ? (
+          <div className="KioskPriceRow-terms">
+            <span>{t('admin.product.seats')}</span>
+            <input
+              className="FormControl KioskTiny"
+              type="number"
+              min={1}
+              max={1000}
+              value={p.seats}
+              aria-label={extractText(t('admin.product.seats'))}
+              oninput={(e: InputEvent) => (p.seats = Math.min(1000, Math.max(1, parseInt((e.target as HTMLInputElement).value) || 1)))}
+            />
+            <span className="KioskPriceRow-hint">{t('admin.product.seats_help')}</span>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -491,6 +519,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
           intervalCount: x.intervalCount,
           termDays: x.termDays,
           trialDays: x.trialDays,
+          seats: x.seats,
         })),
       },
       this.attrs.product?.id

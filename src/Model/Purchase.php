@@ -37,6 +37,9 @@ use Illuminate\Support\Str;
  * @property Carbon|null $reminded_at
  * @property string|null $context_type
  * @property int|null $context_id
+ * @property string|null $coupon_code
+ * @property int|null $gifted_by
+ * @property int $seats
  * @property-read User|null $user
  * @property-read Product|null $product
  * @property-read Price|null $price
@@ -67,6 +70,8 @@ class Purchase extends AbstractModel
         'amount_cents' => 'int',
         'interval_count' => 'int',
         'term_days' => 'int',
+        'gifted_by' => 'int',
+        'seats' => 'int',
         'cancel_at_period_end' => 'bool',
         'period_start' => 'datetime',
         'period_end' => 'datetime',
@@ -90,6 +95,7 @@ class Purchase extends AbstractModel
         $purchase->interval = $price->interval;
         $purchase->interval_count = $price->interval_count;
         $purchase->term_days = $price->term_days;
+        $purchase->seats = max(1, (int) $price->seats);
         $purchase->provider = $provider;
         $purchase->mode = $mode;
         $purchase->status = self::PENDING;

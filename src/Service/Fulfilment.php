@@ -58,8 +58,17 @@ class Fulfilment
         $won = $this->db->transaction(fn () => $this->activateInTransaction($purchase, $periodStart, $periodEnd));
 
         if ($won) {
+            if ($purchase->coupon_code) {
+                $this->db->table('kiosk_coupons')->where('code', $purchase->coupon_code)->increment('used_count');
+            }
+
             $this->events->dispatch(new Event\PurchaseActivated($purchase));
-            $this->notify($purchase, 'receipt');
+            $this->notify($purchase, $purchase->gifted_by ? 'gift' : 'receipt');
+
+            // The giver gets the receipt; the recipient was told it's a gift.
+            if ($purchase->gifted_by && ($giver = User::query()->find($purchase->gifted_by))) {
+                $this->notifications->sync(new PurchaseBlueprint($purchase, 'receipt'), [$giver]);
+            }
         }
 
         return $won;
@@ -142,7 +151,7 @@ class Fulfilment
         $purchase->save();
 
         Entitlement::query()->where('purchase_id', $purchase->id)->whereNull('closed_at')->update(['ends_at' => Carbon::now()]);
-        $this->closeDue($purchase->user_id);
+        $this->closeDue(Entitlement::query()->where('purchase_id', $purchase->id)->distinct()->pluck('user_id')->map(fn ($v) => (int) $v)->all());
 
         $this->events->dispatch(new Event\PurchaseEnded($purchase));
         $this->notify($purchase, 'ended');
@@ -209,16 +218,18 @@ class Fulfilment
      *
      * @return int how many were closed
      */
-    public function closeDue(?int $userId = null, int $limit = 500): int
+    /** @param int|list<int>|null $userIds one member, several, or everyone */
+    public function closeDue(int|array|null $userIds = null, int $limit = 500): int
     {
         $due = Entitlement::query()
             ->whereNull('closed_at')
             ->whereNotNull('ends_at')
             ->where('ends_at', '<=', Carbon::now())
-            ->when($userId, fn ($q) => $q->where('user_id', $userId))
+            ->when($userIds !== null, fn ($q) => $q->whereIn('user_id', (array) $userIds))
             ->orderBy('id')
             ->limit($limit)
             ->get();
+        $users = $due->isEmpty() ? collect() : User::query()->whereIn('id', $due->pluck('user_id')->unique())->get()->keyBy('id');
 
         $closed = 0;
 
@@ -237,7 +248,7 @@ class Fulfilment
                 ->where('target_id', $entitlement->target_id)
                 ->exists();
 
-            if (! $stillHeld && ($user = User::query()->find($entitlement->user_id))) {
+            if (! $stillHeld && ($user = $users->get($entitlement->user_id))) {
                 try {
                     $this->types->get($entitlement->type)?->revoke($user, $entitlement->target_id);
                 } catch (\Throwable $e) {
@@ -253,21 +264,17 @@ class Fulfilment
     }
 
     /**
-     * Write (or extend) one entitlement per unlock and call each type's
-     * grant. The unlocks are read from the product when access first opens
-     * and kept with the purchase after that.
+     * Write (or extend) one entitlement per unlock for everyone the purchase
+     * covers — its buyer, and anyone given one of its team seats — and call
+     * each type's grant. The unlocks are read from the product when access
+     * first opens and kept with the purchase after that.
      */
-    private function open(Purchase $purchase): void
+    public function open(Purchase $purchase): void
     {
-        $user = User::query()->find($purchase->user_id);
-
-        if (! $user) {
-            return;
-        }
-
         $existing = Entitlement::query()->where('purchase_id', $purchase->id)->get();
-        $targets = $existing->isNotEmpty()
-            ? $existing->map(fn (Entitlement $e) => ['type' => $e->type, 'target_id' => $e->target_id])->all()
+        $own = $existing->where('user_id', $purchase->user_id);
+        $targets = $own->isNotEmpty()
+            ? $own->map(fn (Entitlement $e) => ['type' => $e->type, 'target_id' => $e->target_id])->values()->all()
             : $this->db->table('kiosk_product_unlocks')->where('product_id', $purchase->product_id)->get(['type', 'target_id'])
                 ->map(fn ($u) => ['type' => (string) $u->type, 'target_id' => (int) $u->target_id])->all();
 
@@ -277,30 +284,71 @@ class Fulfilment
             ? $purchase->period_end->copy()->addDays($this->graceDays())
             : $purchase->period_end;
 
-        foreach ($targets as $target) {
-            $entitlement = $existing->first(fn (Entitlement $e) => $e->type === $target['type'] && $e->target_id === $target['target_id']) ?? new Entitlement();
-            $entitlement->purchase_id = $purchase->id;
-            $entitlement->type = $target['type'];
-            $entitlement->target_id = $target['target_id'];
-            $entitlement->user_id = $purchase->user_id;
-            $entitlement->starts_at ??= $purchase->period_start ?? Carbon::now();
-            $entitlement->ends_at = $endsAt;
-            $entitlement->closed_at = null;
-            $entitlement->save();
+        $holders = [$purchase->user_id, ...$this->db->table('kiosk_seats')->where('purchase_id', $purchase->id)->pluck('user_id')->map(fn ($v) => (int) $v)->all()];
 
-            try {
-                $this->types->get($target['type'])?->grant($user, $target['target_id']);
-            } catch (\Throwable $e) {
-                $this->log->error('[kiosk] grant failed for '.$target['type'].':'.$target['target_id'].': '.$e->getMessage());
-            }
+        $users = User::query()->whereIn('id', array_unique($holders))->get()->keyBy('id');
+        // notify() reads the owner next; don't fetch them twice.
+        if ($owner = $users->get($purchase->user_id)) {
+            $purchase->setRelation('user', $owner);
         }
 
-        $this->access->forget($purchase->user_id);
+        foreach ($users as $userId => $user) {
+            $userId = (int) $userId;
+
+            foreach ($targets as $target) {
+                $entitlement = $existing->first(fn (Entitlement $e) => $e->user_id === $userId && $e->type === $target['type'] && $e->target_id === $target['target_id']) ?? new Entitlement();
+                $entitlement->purchase_id = $purchase->id;
+                $entitlement->type = $target['type'];
+                $entitlement->target_id = $target['target_id'];
+                $entitlement->user_id = $userId;
+                $entitlement->starts_at ??= $purchase->period_start ?? Carbon::now();
+                $entitlement->ends_at = $endsAt;
+                $entitlement->closed_at = null;
+                $entitlement->save();
+
+                try {
+                    $this->types->get($target['type'])?->grant($user, $target['target_id']);
+                } catch (\Throwable $e) {
+                    $this->log->error('[kiosk] grant failed for '.$target['type'].':'.$target['target_id'].': '.$e->getMessage());
+                }
+            }
+
+            $this->access->forget($userId);
+        }
+    }
+
+    /**
+     * The provider moved this subscription to another price: the purchase
+     * takes the new terms from its next bill. A coupon doesn't carry over.
+     */
+    public function switchPrice(Purchase $purchase, Price $to): void
+    {
+        if ($purchase->price_id === $to->id || $to->product_id !== $purchase->product_id || ! $to->isRecurring()) {
+            return;
+        }
+
+        $purchase->price_id = $to->id;
+        $purchase->amount_cents = $to->amount_cents;
+        $purchase->currency = strtoupper($to->currency);
+        $purchase->interval = $to->interval;
+        $purchase->interval_count = $to->interval_count;
+        $purchase->seats = max(1, (int) $to->seats);
+        $purchase->coupon_code = null;
+        $purchase->save();
+
+        // Fewer seats on the new plan: the latest seat holders lose theirs.
+        $over = $this->db->table('kiosk_seats')->where('purchase_id', $purchase->id)->count() - ($purchase->seats - 1);
+        $extra = $over > 0 ? $this->db->table('kiosk_seats')->where('purchase_id', $purchase->id)->orderByDesc('added_at')->limit($over)->pluck('user_id') : [];
+        foreach ($extra as $userId) {
+            $this->db->table('kiosk_seats')->where('purchase_id', $purchase->id)->where('user_id', $userId)->delete();
+            Entitlement::query()->where('purchase_id', $purchase->id)->where('user_id', $userId)->whereNull('closed_at')->update(['ends_at' => Carbon::now()]);
+            $this->closeDue((int) $userId);
+        }
     }
 
     public function notify(Purchase $purchase, string $kind): void
     {
-        if ($purchase->provider === Purchase::GRANT && $kind !== 'receipt') {
+        if ($purchase->provider === Purchase::GRANT && ! in_array($kind, ['receipt', 'gift'], true)) {
             return;
         }
 

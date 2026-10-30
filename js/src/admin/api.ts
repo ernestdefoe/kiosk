@@ -74,3 +74,19 @@ export const connectPayPal = (data: { mode: string; clientId?: string; secret?: 
   call<{ data: { ok: boolean; mode: string; step?: string; error?: string; status: PayPalStatus } }>('POST', '/admin/paypal', data);
 export const connectStripe = (data: { key?: string; mode?: string; use?: boolean }) =>
   call<{ data: { ok: boolean; mode: string; step?: string; error?: string; status: StripeStatus } }>('POST', '/admin/stripe', data);
+
+export interface Coupon {
+  id: number;
+  code: string;
+  kind: 'percent' | 'amount';
+  value: number;
+  currency: string | null;
+  productIds: number[];
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+}
+
+export const coupons = () => call<{ data: Coupon[] }>('GET', '/admin/coupons');
+export const createCoupon = (body: Record<string, unknown>) => call<{ data: Coupon }>('POST', '/admin/coupons', body);
+export const deleteCoupon = (id: number) => call<void>('DELETE', `/admin/coupons/${id}`);

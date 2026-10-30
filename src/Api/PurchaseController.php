@@ -2,10 +2,13 @@
 
 namespace Ernestdefoe\Kiosk\Api;
 
+use Ernestdefoe\Kiosk\Model\Price;
 use Ernestdefoe\Kiosk\Model\Purchase;
 use Ernestdefoe\Kiosk\Provider\Providers;
 use Ernestdefoe\Kiosk\Service\Fulfilment;
 use Ernestdefoe\Kiosk\Service\Presenter;
+use Ernestdefoe\Kiosk\Service\Seats;
+use Flarum\Http\UrlGenerator;
 use Flarum\Foundation\ValidationException;
 use Flarum\Locale\TranslatorInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -21,6 +24,11 @@ use Psr\Http\Server\RequestHandlerInterface;
  * GET  /kiosk/purchases/{number}      — one, for the return page to poll
  * POST /kiosk/purchases/{number}/confirm — back from PayPal: ask it what happened
  * POST /kiosk/purchases/{number}/cancel  — stop a subscription renewing
+ * POST /kiosk/purchases/{number}/switch  {priceId} — move to another plan
+ * POST /kiosk/purchases/{number}/seats   {username} — give a team seat
+ * DELETE /kiosk/purchases/{number}/seats/{userId} — take one back
+ *
+ * Listed: what they own, gifts they gave, and seats they were given.
  */
 class PurchaseController implements RequestHandlerInterface
 {
@@ -31,6 +39,8 @@ class PurchaseController implements RequestHandlerInterface
         private Providers $providers,
         private Fulfilment $fulfilment,
         private TranslatorInterface $translator,
+        private Seats $seats,
+        private UrlGenerator $url,
     ) {
     }
 
@@ -42,24 +52,39 @@ class PurchaseController implements RequestHandlerInterface
 
         if ($number === '') {
             $purchases = Purchase::query()
-                ->where('user_id', $actor->id)
+                ->where(fn ($q) => $q->where('user_id', $actor->id)->orWhere('gifted_by', $actor->id)
+                    ->orWhereIn('id', fn ($s) => $s->select('purchase_id')->from('kiosk_seats')->where('user_id', $actor->id)))
                 ->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED])
                 ->with(['entitlements', 'payments'])
                 ->orderByDesc('id')
                 ->limit(200)
                 ->get();
 
-            return new JsonResponse(['data' => $this->presenter->purchases($purchases)]);
+            return new JsonResponse(['data' => $this->presenter->purchases($purchases, false, $actor)]);
         }
 
-        // Someone else's number is "not found", the same as a wrong one.
-        $purchase = Purchase::query()->where('number', $number)->where('user_id', $actor->id)->first()
+        // Someone else's number is "not found", the same as a wrong one. The
+        // giver of a gift may follow it through checkout; only the owner
+        // manages it after that.
+        $purchase = Purchase::query()->where('number', $number)
+            ->where(fn ($q) => $q->where('user_id', $actor->id)->orWhere('gifted_by', $actor->id))->first()
             ?? throw new ModelNotFoundException();
 
         $route = (string) $request->getAttribute('routeName');
+        $owner = $purchase->user_id === (int) $actor->id;
+
+        if (! $owner && ! str_ends_with($route, '.confirm') && ! str_ends_with($route, '.show')) {
+            throw new ModelNotFoundException();
+        }
 
         if (str_ends_with($route, '.confirm')) {
-            $this->providers->get($purchase->provider)?->confirm($purchase);
+            $provider = $this->providers->get($purchase->provider);
+            // Back from approving a plan switch: read the subscription again.
+            if ($purchase->status === Purchase::PENDING) {
+                $provider?->confirm($purchase);
+            } elseif ($owner) {
+                $provider?->reconcile($purchase);
+            }
             $purchase->refresh();
         } elseif (str_ends_with($route, '.cancel')) {
             if (! $purchase->isRecurring() || $purchase->status !== Purchase::ACTIVE || $purchase->provider === Purchase::GRANT) {
@@ -70,10 +95,28 @@ class PurchaseController implements RequestHandlerInterface
             }
             $this->fulfilment->cancelAtPeriodEnd($purchase);
             $purchase->refresh();
+        } elseif (str_ends_with($route, '.switch')) {
+            $to = Price::query()->whereNull('archived_at')->where('product_id', $purchase->product_id)->find((int) ($this->body($request)['priceId'] ?? 0));
+            $provider = $this->providers->get($purchase->provider);
+
+            if (! $to || ! $to->isRecurring() || $to->id === $purchase->price_id || $purchase->status !== Purchase::ACTIVE || $purchase->cancel_at_period_end || ! $provider || ! $provider->supports($to)) {
+                throw new ValidationException(['purchase' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.cannot_switch')]);
+            }
+
+            $approve = $provider->switchPlan($purchase, $to, $this->url->to('forum')->route('kiosk.return', ['number' => $purchase->number]).'?switched=1');
+
+            if ($approve) {
+                return new JsonResponse(['data' => ['url' => $approve]]);
+            }
+            $purchase->refresh();
+        } elseif (str_ends_with($route, '.seats.add')) {
+            $this->seats->add($purchase, (string) ($this->body($request)['username'] ?? ''));
+        } elseif (str_ends_with($route, '.seats.remove')) {
+            $this->seats->remove($purchase, $this->routeId($request, 'userId'));
         }
 
         $purchase->load(['entitlements', 'payments']);
 
-        return new JsonResponse(['data' => $this->presenter->purchases([$purchase])[0]]);
+        return new JsonResponse(['data' => $this->presenter->purchases([$purchase], false, $actor)[0]]);
     }
 }

@@ -22,6 +22,7 @@ class FakePayPal
     public string $verification = 'SUCCESS';
     public string $subscriptionStatus = 'ACTIVE';
     public string $nextBilling = '';
+    public string $planId = 'P-PLAN1';
 
     public function __invoke(RequestInterface $request): Response
     {
@@ -54,10 +55,14 @@ class FakePayPal
                 'links' => [['rel' => 'approve', 'href' => 'https://www.sandbox.paypal.com/webapps/billing/subscriptions?ba_token=X']],
             ], 201),
             $method === 'GET' && str_starts_with($path, '/v1/billing/subscriptions/') => $this->json([
-                'id' => basename($path), 'status' => $this->subscriptionStatus, 'start_time' => gmdate('Y-m-d\TH:i:s\Z'),
+                'id' => basename($path), 'status' => $this->subscriptionStatus, 'plan_id' => $this->planId, 'start_time' => gmdate('Y-m-d\TH:i:s\Z'),
                 'billing_info' => ['next_billing_time' => $this->nextBilling ?: gmdate('Y-m-d\TH:i:s\Z', strtotime('+1 month'))],
             ]),
             $method === 'POST' && str_ends_with($path, '/cancel') => new Response(204),
+            $method === 'POST' && str_ends_with($path, '/revise') => $this->json([
+                'plan_id' => $body['plan_id'] ?? '', 'links' => [['rel' => 'approve', 'href' => 'https://www.sandbox.paypal.com/webapps/billing/subscriptions/update?ba_token=X']],
+            ]),
+            $method === 'GET' && str_starts_with($path, '/v1/billing/plans/') => $this->json(['id' => basename($path), 'product_id' => 'PROD-1']),
             str_ends_with($path, '/refund') => $this->json(['id' => 'REF-1', 'status' => 'COMPLETED'], 201),
             default => $this->json(['name' => 'NOT_FOUND'], 404),
         };

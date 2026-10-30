@@ -10,9 +10,14 @@ export class PurchaseNotification extends Notification {
 
   icon() {
     return (
-      { receipt: 'fas fa-receipt', payment_failed: 'fas fa-triangle-exclamation', reminder: 'fas fa-calendar-day', ended: 'fas fa-lock' }[
-        this.kind()
-      ] || 'fas fa-store'
+      {
+        receipt: 'fas fa-receipt',
+        payment_failed: 'fas fa-triangle-exclamation',
+        reminder: 'fas fa-calendar-day',
+        ended: 'fas fa-lock',
+        gift: 'fas fa-gift',
+        seat: 'fas fa-users',
+      }[this.kind()] || 'fas fa-store'
     );
   }
 

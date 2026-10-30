@@ -3,10 +3,12 @@
 namespace Ernestdefoe\Kiosk\Service;
 
 use Carbon\Carbon;
+use Ernestdefoe\Kiosk\Model\Coupon;
 use Ernestdefoe\Kiosk\Model\Price;
 use Ernestdefoe\Kiosk\Model\Purchase;
 use Ernestdefoe\Kiosk\Provider\Providers;
 use Flarum\Foundation\ValidationException;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Flarum\Http\UrlGenerator;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\User\User;
@@ -22,15 +24,19 @@ class Checkout
 
     public function __construct(
         private Providers $providers,
+        private Fulfilment $fulfilment,
+        private Cache $cache,
         private UrlGenerator $url,
         private TranslatorInterface $translator,
     ) {
     }
 
     /**
-     * @param array{amount?: mixed, context?: array{type?: string, id?: int}} $options
+     * @param array{amount?: mixed, context?: array{type?: string, id?: int}, coupon?: string, giftTo?: string} $options
      *   amount: what the buyer chose, for a pay-what-you-want price;
-     *   context: what a tip backs ({type: discussion, id}).
+     *   context: what a tip backs ({type: discussion, id});
+     *   coupon: a discount code;
+     *   giftTo: the username of the member it's for (not subscriptions).
      * @return array{url: string, number: string}
      */
     public function start(User $actor, int $priceId, string $providerKey, array $options = []): array
@@ -51,7 +57,18 @@ class Checkout
             throw $this->error('unavailable');
         }
 
-        if ($refusal = $product->refusal($actor)) {
+        // A gift is bought by the actor for someone else: the recipient is
+        // who must be allowed it and who the purchase belongs to.
+        $recipient = $actor;
+        $gift = trim((string) ($options['giftTo'] ?? ''));
+        if ($gift !== '') {
+            $recipient = User::query()->where('username', $gift)->first() ?? throw $this->error('no_such_user');
+            if ($price->isRecurring() || $price->kind === Price::CUSTOM || (int) $recipient->id === (int) $actor->id || $product->unlocks()->whereIn('type', ['tip', 'bump', 'post'])->exists()) {
+                throw $this->error('no_gift');
+            }
+        }
+
+        if ($refusal = $product->refusal($recipient)) {
             throw $this->error($refusal);
         }
 
@@ -77,7 +94,10 @@ class Checkout
             throw $this->error('too_many');
         }
 
-        $purchase = Purchase::start($actor, $price, $product, $provider->key(), $provider->mode());
+        $purchase = Purchase::start($recipient, $price, $product, $provider->key(), $provider->mode());
+        if ($recipient !== $actor) {
+            $purchase->gifted_by = $actor->id;
+        }
 
         if ($price->kind === Price::CUSTOM) {
             $chosen = \Ernestdefoe\Kiosk\Model\Money::toMinor($options['amount'] ?? null, $price->currency);
@@ -87,7 +107,30 @@ class Checkout
             $purchase->amount_cents = $chosen;
         }
 
+        $code = trim((string) ($options['coupon'] ?? ''));
+        if ($code !== '') {
+            $discounted = $this->coupon($code, $actor)?->apply($price);
+            // 🚨 A free subscription would never renew through a provider.
+            if ($discounted === null || ($discounted === 0 && $price->isRecurring())) {
+                throw $this->error('coupon');
+            }
+            $purchase->amount_cents = $discounted;
+            $purchase->coupon_code = strtoupper($code);
+        }
+
         $this->applyContext($purchase, $product, $options['context'] ?? null);
+
+        // Nothing to pay: open it now, with no trip to a provider.
+        if ($purchase->amount_cents === 0) {
+            $purchase->provider = Purchase::GRANT;
+            $purchase->mode = null;
+            $purchase->save();
+            $now = Carbon::now();
+            $this->fulfilment->activate($purchase, $now, $purchase->periodEndFrom($now));
+
+            return ['url' => $this->url->to('forum')->route('kiosk.return', ['number' => $purchase->number]), 'number' => $purchase->number];
+        }
+
         $purchase->save();
 
         $return = $this->url->to('forum')->route('kiosk.return', ['number' => $purchase->number]);
@@ -128,6 +171,28 @@ class Checkout
 
         $purchase->context_type = 'discussion';
         $purchase->context_id = $discussion->id;
+    }
+
+    /**
+     * A code that exists, case-insensitively. Whether it applies is
+     * Coupon::apply. 🚨 Ten wrong codes an hour per member, so codes can't
+     * be guessed by trying them.
+     */
+    public function coupon(string $code, User $actor): ?Coupon
+    {
+        $key = 'kiosk.coupon_misses.'.$actor->id;
+
+        if ((int) $this->cache->get($key, 0) >= 10) {
+            throw $this->error('too_many');
+        }
+
+        $coupon = Coupon::query()->where('code', strtoupper(trim($code)))->first();
+
+        if (! $coupon) {
+            $this->cache->put($key, (int) $this->cache->get($key, 0) + 1, 3600);
+        }
+
+        return $coupon;
     }
 
     private function error(string $reason): ValidationException

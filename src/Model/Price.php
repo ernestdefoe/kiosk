@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int|null $term_days
  * @property int $trial_days
  * @property int $position
+ * @property int $seats
  * @property Carbon $created_at
  * @property Carbon|null $archived_at
  * @property-read Product|null $product
@@ -41,6 +42,7 @@ class Price extends AbstractModel
         'interval_count' => 'int',
         'term_days' => 'int',
         'trial_days' => 'int',
+        'seats' => 'int',
         'position' => 'int',
         'created_at' => 'datetime',
         'archived_at' => 'datetime',
@@ -60,6 +62,6 @@ class Price extends AbstractModel
     /** The terms a buyer agrees to, compared when deciding whether an edit needs a new row. */
     public function terms(): string
     {
-        return implode('|', [$this->amount_cents, strtoupper($this->currency), $this->kind, $this->interval, $this->interval_count, $this->term_days, $this->trial_days]);
+        return implode('|', [$this->amount_cents, strtoupper($this->currency), $this->kind, $this->interval, $this->interval_count, $this->term_days, $this->trial_days, $this->seats ?: 1]);
     }
 }
