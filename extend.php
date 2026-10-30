@@ -18,6 +18,7 @@ use Ernestdefoe\Kiosk\KioskServiceProvider;
 use Ernestdefoe\Kiosk\Listener\HideSecrets;
 use Ernestdefoe\Kiosk\Notification\PurchaseBlueprint;
 use Ernestdefoe\Kiosk\Provider\PayPal;
+use Ernestdefoe\Kiosk\Provider\Stripe;
 use Ernestdefoe\Kiosk\Service\Access;
 use Ernestdefoe\Kiosk\Unlock\GroupUnlock;
 use Ernestdefoe\Kiosk\Unlock\TagUnlock;
@@ -52,6 +53,7 @@ return [
 
     new Kiosk\UnlockType('group', GroupUnlock::class),
     new Kiosk\Provider('paypal', PayPal::class),
+    new Kiosk\Provider('stripe', Stripe::class),
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
@@ -75,7 +77,7 @@ return [
         ->get('/kiosk/purchases/{number}', 'kiosk.purchases.show', Api\PurchaseController::class)
         ->post('/kiosk/purchases/{number}/confirm', 'kiosk.purchases.confirm', Api\PurchaseController::class)
         ->post('/kiosk/purchases/{number}/cancel', 'kiosk.purchases.cancel', Api\PurchaseController::class)
-        ->post('/kiosk/webhooks/paypal', 'kiosk.webhooks.paypal', Api\PayPalWebhookController::class)
+        ->post('/kiosk/webhooks/{provider:[a-z]+}', 'kiosk.webhooks', Api\WebhookController::class)
         ->get('/kiosk/admin/overview', 'kiosk.admin.overview', Api\Admin\OverviewController::class)
         ->get('/kiosk/admin/products', 'kiosk.admin.products', Api\Admin\ProductsController::class)
         ->post('/kiosk/admin/products', 'kiosk.admin.products.create', Api\Admin\ProductsController::class)
@@ -90,10 +92,11 @@ return [
         ->post('/kiosk/admin/grants', 'kiosk.admin.grants', Api\Admin\PurchasesController::class)
         ->get('/kiosk/admin/webhooks', 'kiosk.admin.webhooks', Api\Admin\WebhooksController::class)
         ->post('/kiosk/admin/webhooks/{id:[0-9]+}/replay', 'kiosk.admin.webhooks.replay', Api\Admin\WebhooksController::class)
-        ->post('/kiosk/admin/paypal', 'kiosk.admin.paypal', Api\Admin\PayPalController::class),
+        ->post('/kiosk/admin/paypal', 'kiosk.admin.paypal', Api\Admin\PayPalController::class)
+        ->post('/kiosk/admin/stripe', 'kiosk.admin.stripe', Api\Admin\StripeController::class),
 
-    // PayPal cannot send a CSRF token; the signature check stands in for it.
-    (new Extend\Csrf())->exemptRoute('kiosk.webhooks.paypal'),
+    // Providers cannot send a CSRF token; the signature check stands in for it.
+    (new Extend\Csrf())->exemptRoute('kiosk.webhooks'),
 
     new Extend\ApiResource(Api\Resource\PurchaseResource::class),
 

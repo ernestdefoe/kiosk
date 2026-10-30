@@ -28,7 +28,7 @@ use Psr\Log\LoggerInterface;
  * (confirm), webhooks are verified with PayPal before they are read, and every
  * amount PayPal reports is compared with the amount we asked for.
  */
-class PayPal implements Provider
+class PayPal implements Provider, WebhookProvider
 {
     public function __construct(
         private PayPalClient $api,
@@ -309,6 +309,21 @@ class PayPal implements Provider
         return is_array($amount)
             && Money::toMinor($amount['value'] ?? null, $purchase->currency) === $purchase->amount_cents
             && strcasecmp((string) ($amount['currency_code'] ?? ''), $purchase->currency) === 0;
+    }
+
+    public function verify(array $headers, string $rawBody): bool
+    {
+        return $this->api->verifyWebhook($headers, $rawBody) !== null;
+    }
+
+    public function eventId(array $event): string
+    {
+        return (string) ($event['id'] ?? '');
+    }
+
+    public function eventType(array $event): string
+    {
+        return (string) ($event['event_type'] ?? '');
     }
 
     /**

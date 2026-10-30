@@ -3,9 +3,10 @@
 namespace Ernestdefoe\Kiosk\Api\Admin;
 
 use Ernestdefoe\Kiosk\Api\Concerns;
-use Ernestdefoe\Kiosk\Api\PayPalWebhookController;
+use Ernestdefoe\Kiosk\Api\WebhookController;
 use Ernestdefoe\Kiosk\Model\WebhookEvent;
-use Ernestdefoe\Kiosk\Provider\PayPal;
+use Ernestdefoe\Kiosk\Provider\Providers;
+use Ernestdefoe\Kiosk\Provider\WebhookProvider;
 use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -17,7 +18,7 @@ class WebhooksController implements RequestHandlerInterface
 {
     use Concerns;
 
-    public function __construct(private PayPal $paypal, private LoggerInterface $log)
+    public function __construct(private Providers $providers, private LoggerInterface $log)
     {
     }
 
@@ -27,8 +28,9 @@ class WebhooksController implements RequestHandlerInterface
 
         if ($request->getMethod() === 'POST') {
             $row = WebhookEvent::query()->findOrFail($this->routeId($request));
-            if ($row->provider === 'paypal') {
-                PayPalWebhookController::process($row, $this->paypal, $this->log);
+            $provider = $this->providers->get($row->provider);
+            if ($provider instanceof WebhookProvider) {
+                WebhookController::process($row, $provider, $this->log);
             }
             $rows = collect([$row->refresh()]);
         } else {

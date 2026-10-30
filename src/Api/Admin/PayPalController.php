@@ -46,7 +46,7 @@ class PayPalController implements RequestHandlerInterface
             $this->settings->delete($prefix.'webhook_id');
         }
 
-        $result = $this->paypal->connect($this->url->to('api')->route('kiosk.webhooks.paypal'), $mode);
+        $result = $this->paypal->connect($this->url->to('api')->route('kiosk.webhooks', ['provider' => 'paypal']), $mode);
 
         if ($result['ok'] && ! empty($body['use'])) {
             $this->settings->set('ernestdefoe-kiosk.paypal_mode', $mode);

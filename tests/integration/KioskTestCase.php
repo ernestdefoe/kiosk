@@ -28,6 +28,7 @@ abstract class KioskTestCase extends TestCase
     protected const LOUNGE = 2;
 
     protected FakePayPal $paypal;
+    protected FakeStripe $stripe;
 
     protected function setUp(): void
     {
@@ -62,13 +63,20 @@ abstract class KioskTestCase extends TestCase
         $this->setting('ernestdefoe-kiosk.paypal_sandbox_secret', 'secret');
         $this->setting('ernestdefoe-kiosk.paypal_sandbox_webhook_id', 'WH-1');
 
+        $this->setting('ernestdefoe-kiosk.stripe_mode', 'test');
+        $this->setting('ernestdefoe-kiosk.stripe_test_secret', 'sk_test_123');
+        $this->setting('ernestdefoe-kiosk.stripe_test_webhook_secret', 'whsec_test');
+
         $this->paypal = new FakePayPal();
+        $this->stripe = new FakeStripe();
     }
 
     /** Boot the app with PayPal faked. */
     protected function boot(): void
     {
-        $this->app()->getContainer()->instance(Client::class, new Client(['handler' => HandlerStack::create(fn ($request) => Create::promiseFor(($this->paypal)($request)))]));
+        $this->app()->getContainer()->instance(Client::class, new Client(['handler' => HandlerStack::create(fn ($request) => Create::promiseFor(
+            $request->getUri()->getHost() === 'api.stripe.com' ? ($this->stripe)($request) : ($this->paypal)($request)
+        ))]));
     }
 
     /** @param array<string, mixed> $data */
@@ -131,5 +139,21 @@ abstract class KioskTestCase extends TestCase
     protected function seesLounge(int $userId): bool
     {
         return $this->api('GET', '/discussions/1', $userId)->getStatusCode() === 200;
+    }
+
+    /**
+     * A Stripe webhook, signed the way Stripe signs it.
+     *
+     * @param array<string, mixed> $object
+     */
+    protected function stripeWebhook(string $type, array $object, ?string $id = null, string $secret = 'whsec_test', ?int $at = null): ResponseInterface
+    {
+        $this->boot();
+        $raw = (string) json_encode(['id' => $id ?? 'evt_'.uniqid(), 'type' => $type, 'data' => ['object' => $object]]);
+        $t = $at ?? time();
+
+        return $this->send($this->request('POST', '/api/kiosk/webhooks/stripe', ['json' => json_decode($raw, true)])
+            ->withBody((new StreamFactory())->createStream($raw))
+            ->withHeader('Stripe-Signature', 't='.$t.',v1='.hash_hmac('sha256', $t.'.'.$raw, $secret)));
     }
 }

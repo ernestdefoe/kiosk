@@ -20,9 +20,18 @@ export interface PayPalStatus {
   live: ProviderMode;
 }
 
+export interface StripeStatus {
+  mode: 'test' | 'live';
+  lastWebhookAt: string | null;
+  test: { keyHint: string | null; connected: boolean };
+  live: { keyHint: string | null; connected: boolean };
+}
+
 export interface Overview {
   paypal: PayPalStatus;
+  stripe: StripeStatus;
   webhookUrl: string;
+  stripeWebhookUrl: string;
   checklist: { provider: boolean; product: boolean; sale: boolean; scheduler: boolean };
   stats: {
     activeMembers: number;
@@ -63,3 +72,5 @@ export const webhooks = (failed = false) => call<{ data: WebhookRow[] }>('GET', 
 export const replay = (id: number) => call<{ data: WebhookRow[] }>('POST', `/admin/webhooks/${id}/replay`);
 export const connectPayPal = (data: { mode: string; clientId?: string; secret?: string; use?: boolean }) =>
   call<{ data: { ok: boolean; mode: string; step?: string; error?: string; status: PayPalStatus } }>('POST', '/admin/paypal', data);
+export const connectStripe = (data: { key?: string; mode?: string; use?: boolean }) =>
+  call<{ data: { ok: boolean; mode: string; step?: string; error?: string; status: StripeStatus } }>('POST', '/admin/stripe', data);

@@ -541,3 +541,24 @@ button.KioskTemplate {
     text-align: left;
   }
 }
+
+.KioskProviders {
+  display: grid;
+  gap: 30px;
+  grid-template-columns: repeat(auto-fill, minmax(~"min(420px, 100%)", 1fr));
+  align-items: start;
+
+  .KioskProvider {
+    max-width: none;
+    min-width: 0;
+    padding: 20px;
+    border-radius: var(--border-radius, 8px);
+    background: var(--control-bg);
+  }
+  .KioskFacts code {
+    background: var(--body-bg);
+  }
+}
+.KioskProvider .KioskProvider-head > .fa-stripe {
+  color: #635bff;
+}

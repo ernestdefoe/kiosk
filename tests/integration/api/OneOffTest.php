@@ -24,7 +24,7 @@ class OneOffTest extends KioskTestCase
 
         $store = $this->json($this->api('GET', '/kiosk/store', self::BUYER));
         $this->assertCount(1, $store['data']);
-        $this->assertSame([['key' => 'paypal', 'mode' => 'sandbox']], $store['meta']['providers']);
+        $this->assertContains(['key' => 'paypal', 'mode' => 'sandbox'], $store['meta']['providers']);
 
         $start = $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $product['prices'][0]['id'], 'provider' => 'paypal']);
         $this->assertSame(200, $start->getStatusCode(), (string) $start->getBody());

@@ -11,7 +11,7 @@ import { t } from '../common/t';
 import { date, money, priceLabel } from '../common/money';
 import type { Product, Purchase } from '../common/api';
 import * as api from './api';
-import type { Overview, PayPalStatus, WebhookRow } from './api';
+import type { Overview, PayPalStatus, StripeStatus, WebhookRow } from './api';
 import ProductModal from './ProductModal';
 import GrantModal from './GrantModal';
 import Sortable from './sortable';
@@ -21,6 +21,7 @@ type Tab = 'overview' | 'products' | 'purchases' | 'payments' | 'webhooks' | 'se
 const TABS: Tab[] = ['overview', 'products', 'purchases', 'payments', 'webhooks', 'settings'];
 
 const PAYPAL_APPS = 'https://developer.paypal.com/dashboard/applications';
+const STRIPE_KEYS = 'https://dashboard.stripe.com/apikeys';
 
 /**
  * Kiosk's admin: a setup checklist until the store is ready, then the
@@ -47,6 +48,10 @@ export default class KioskPage extends ExtensionPage {
   clientId = '';
   secret = '';
   connectResult: { ok: boolean; step?: string; error?: string } | null = null;
+
+  // Stripe form
+  stripeKey = '';
+  stripeResult: { ok: boolean; step?: string; error?: string; mode?: string } | null = null;
 
   oninit(vnode: Mithril.Vnode<any, this>) {
     super.oninit(vnode);
@@ -482,6 +487,113 @@ export default class KioskPage extends ExtensionPage {
   // ─── Payments ────────────────────────────────────────────────────────────
 
   paymentsTab(): Mithril.Children {
+    return (
+      <div className="KioskProviders">
+        {this.paypalCard()}
+        {this.stripeCard()}
+      </div>
+    );
+  }
+
+  stripeCard(): Mithril.Children {
+    const s: StripeStatus = this.overview!.stripe;
+    const current = s[s.mode];
+    const other = s.mode === 'live' ? 'test' : 'live';
+    const typed = this.stripeKey.startsWith('sk_live_') || this.stripeKey.startsWith('rk_live_') ? 'live' : this.stripeKey ? 'test' : null;
+
+    return (
+      <section className="KioskProvider">
+        <header className="KioskProvider-head">
+          <Icon name="fab fa-stripe" />
+          <h3>Stripe</h3>
+          <span className={classList('KioskStatus', current.connected ? 'KioskStatus--active' : 'KioskStatus--pending')}>
+            {current.connected ? t('admin.payments.connected') : t('admin.payments.not_connected')}
+          </span>
+          {current.connected ? (
+            s.mode === 'live' ? (
+              <span className="KioskTag KioskTag--live">{t('admin.payments.live_now')}</span>
+            ) : (
+              <span className="KioskTag">{t('admin.payments.test_now')}</span>
+            )
+          ) : null}
+        </header>
+
+        <p className="helpText">{t('admin.stripe.help', { a: <a href={STRIPE_KEYS} target="_blank" rel="noopener" /> })}</p>
+
+        <div className="Form-group">
+          <label>{t('admin.stripe.key')}</label>
+          <input
+            className="FormControl"
+            type="password"
+            autocomplete="new-password"
+            value={this.stripeKey}
+            placeholder={current.keyHint ? extractText(t('admin.stripe.key_saved', { hint: current.keyHint })) : 'sk_test_…'}
+            oninput={(e: InputEvent) => (this.stripeKey = (e.target as HTMLInputElement).value.trim())}
+          />
+          {typed ? <small className="KioskNote">{t('admin.stripe.detected_' + typed)}</small> : null}
+        </div>
+
+        <div className="KioskToolbar">
+          <Button
+            className="Button Button--primary"
+            loading={this.busy === 'stripe'}
+            disabled={!this.stripeKey && !current.keyHint}
+            onclick={() => this.connectStripe()}
+          >
+            {current.connected && !this.stripeKey ? t('admin.payments.reconnect') : t('admin.payments.connect')}
+          </Button>
+          {s[other].connected ? (
+            <Button className="Button" loading={this.busy === 'stripe-use'} onclick={() => this.connectStripe(other)}>
+              {t(other === 'live' ? 'admin.payments.go_live' : 'admin.payments.back_to_test')}
+            </Button>
+          ) : null}
+        </div>
+
+        {this.stripeResult && !this.stripeResult.ok ? (
+          <p className="KioskWarning">
+            <Icon name="fas fa-triangle-exclamation" /> {t('admin.stripe.failed.' + (this.stripeResult.step || 'unreachable'))}
+            {this.stripeResult.error ? <small className="KioskWarning-detail">{this.stripeResult.error}</small> : null}
+          </p>
+        ) : this.stripeResult?.ok ? (
+          <p className="KioskSuccess">
+            <Icon name="fas fa-circle-check" /> {t('admin.stripe.ok')}
+          </p>
+        ) : null}
+
+        <dl className="KioskFacts">
+          <dt>{t('admin.payments.webhook')}</dt>
+          <dd>
+            <code>{this.overview!.stripeWebhookUrl}</code>
+            <small>{t('admin.stripe.webhook_help')}</small>
+          </dd>
+          <dt>{t('admin.payments.last_webhook')}</dt>
+          <dd>{s.lastWebhookAt ? new Date(s.lastWebhookAt).toLocaleString() : t('admin.payments.never')}</dd>
+        </dl>
+      </section>
+    );
+  }
+
+  connectStripe(switchTo?: 'test' | 'live') {
+    this.busy = switchTo ? 'stripe-use' : 'stripe';
+    this.stripeResult = null;
+    const data = switchTo ? { mode: switchTo, use: true } : this.stripeKey ? { key: this.stripeKey } : { mode: this.overview!.stripe.mode };
+
+    api.connectStripe(data).then(
+      ({ data }) => {
+        this.stripeResult = data;
+        this.overview!.stripe = data.status;
+        this.stripeKey = '';
+        this.busy = null;
+        this.loadOverview();
+      },
+      () => {
+        this.busy = null;
+        m.redraw();
+      }
+    );
+  }
+
+  paypalCard(): Mithril.Children {
     const s: PayPalStatus = this.overview!.paypal;
     const mine = s[this.mode];
 

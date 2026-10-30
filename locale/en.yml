@@ -6,6 +6,7 @@ ernestdefoe-kiosk:
       tag: Tag
     providers:
       paypal: PayPal
+      stripe: Card (Stripe)
     tag_group:
       singular: "{tag} buyer"
       plural: "{tag} buyers"
@@ -119,9 +120,9 @@ ernestdefoe-kiosk:
       title: Set up your store
       intro: Four steps. Each one turns green when it's done.
       provider:
-        title: Connect PayPal
-        text: Paste your PayPal app's Client ID and Secret. Kiosk does the rest.
-        button: Connect PayPal
+        title: Connect a way to be paid
+        text: Paste your PayPal or Stripe keys. Kiosk does the rest.
+        button: Set up payments
       product:
         title: Create your first product
         text: What do you want to sell? Pick a starting point; you can change everything.
@@ -213,6 +214,18 @@ ernestdefoe-kiosk:
       buyers: Who can buy it
       buyers_help: Leave all unchecked to let any member buy it.
       save: Save product
+    stripe:
+      help: "Copy your secret key from <a>Stripe's API keys page</a>. Use a test key (sk_test_…) to try it out, then add your live key when you're ready."
+      key: Secret key
+      key_saved: "Saved (ending {hint}). Paste a new key to replace it."
+      detected_test: Test key. Nobody is charged.
+      detected_live: Live key. Real payments.
+      ok: Connected. Kiosk set up Stripe's notifications for you.
+      webhook_help: Kiosk registers this with Stripe for you. There's nothing to copy.
+      failed:
+        credentials: Stripe didn't accept this key. Copy the Secret key (not the Publishable key) from Stripe's API keys page.
+        unreachable: Kiosk couldn't reach Stripe. Try again in a moment.
+        webhook: "The key works, but Stripe wouldn't send notifications to this forum. Stripe needs a public https:// address."
     sell_this:
       legend: Sell this
       button: Sell this
@@ -312,7 +325,8 @@ ernestdefoe-kiosk:
       no_such_product: That product doesn't exist.
       provider_unreachable: Kiosk couldn't reach the payment provider. Try again in a moment.
       nothing_to_refund: There's no payment to refund.
-      refund_failed: The payment provider didn't accept the refund. Check the payment in PayPal.
+      refund_failed: The payment provider didn't accept the refund. Check the payment there.
+      stripe_key: "That isn't a Stripe secret key. It starts with sk_test_ or sk_live_."
 
   # Emails. {url} links to the member's purchases.
   email:

@@ -10,6 +10,7 @@ use Ernestdefoe\Kiosk\Model\Product;
 use Ernestdefoe\Kiosk\Model\Purchase;
 use Ernestdefoe\Kiosk\Model\WebhookEvent;
 use Ernestdefoe\Kiosk\Provider\PayPalClient;
+use Ernestdefoe\Kiosk\Provider\StripeClient;
 use Ernestdefoe\Kiosk\Service\Presenter;
 use Flarum\Http\UrlGenerator;
 use Flarum\Settings\SettingsRepositoryInterface;
@@ -29,6 +30,7 @@ class OverviewController implements RequestHandlerInterface
 
     public function __construct(
         private PayPalClient $paypal,
+        private StripeClient $stripe,
         private SettingsRepositoryInterface $settings,
         private UrlGenerator $url,
         private Presenter $presenter,
@@ -60,9 +62,11 @@ class OverviewController implements RequestHandlerInterface
 
         return new JsonResponse(['data' => [
             'paypal' => self::paypalStatus($this->paypal, $this->settings),
-            'webhookUrl' => $this->url->to('api')->route('kiosk.webhooks.paypal'),
+            'stripe' => StripeController::status($this->stripe, $this->settings),
+            'webhookUrl' => $this->url->to('api')->route('kiosk.webhooks', ['provider' => 'paypal']),
+            'stripeWebhookUrl' => $this->url->to('api')->route('kiosk.webhooks', ['provider' => 'stripe']),
             'checklist' => [
-                'provider' => $this->paypal->isConnected(),
+                'provider' => $this->paypal->isConnected() || $this->stripe->isConnected(),
                 'product' => $hasProduct,
                 'sale' => $hasSale,
                 'scheduler' => $this->settings->get('ernestdefoe-kiosk.last_sweep_at') !== null
