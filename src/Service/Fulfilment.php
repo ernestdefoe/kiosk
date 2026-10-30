@@ -53,15 +53,15 @@ class Fulfilment
      */
     public function activate(Purchase $purchase, Carbon $periodStart, ?Carbon $periodEnd): bool
     {
+        if ($this->wrongMode($purchase)) {
+            return false;
+        }
+
         // 🚨 The status change and the access it pays for commit together: a
         // crash in between must not leave an "active" purchase that opens nothing.
         $won = $this->db->transaction(fn () => $this->activateInTransaction($purchase, $periodStart, $periodEnd));
 
         if ($won) {
-            if ($purchase->coupon_code) {
-                $this->db->table('kiosk_coupons')->where('code', $purchase->coupon_code)->increment('used_count');
-            }
-
             $this->events->dispatch(new Event\PurchaseActivated($purchase));
             $this->notify($purchase, $purchase->gifted_by ? 'gift' : 'receipt');
 
@@ -105,6 +105,11 @@ class Fulfilment
         if ($purchase->period_end && $periodEnd->lessThanOrEqualTo($purchase->period_end)) {
             return;
         }
+        // A test subscription goes on renewing at the provider after the
+        // forum goes live: it doesn't keep access going.
+        if ($this->wrongMode($purchase)) {
+            return;
+        }
 
         $purchase->period_end = $periodEnd;
         $purchase->reminded_at = null;
@@ -117,6 +122,27 @@ class Fulfilment
         $this->open($purchase);
 
         $this->events->dispatch(new Event\PurchaseRenewed($purchase));
+    }
+
+    /**
+     * 🚨 A test (sandbox) purchase once the provider is switched to live, or
+     * the other way round: its money isn't the money the forum now takes.
+     */
+    private function wrongMode(Purchase $purchase): bool
+    {
+        if ($purchase->provider === Purchase::GRANT || ! $purchase->mode) {
+            return false;
+        }
+
+        $provider = resolve(\Ernestdefoe\Kiosk\Provider\Providers::class)->get($purchase->provider);
+
+        if ($provider && $provider->mode() !== $purchase->mode) {
+            $this->log->warning('[kiosk] '.$purchase->number.' was made in '.$purchase->mode.' mode; '.$purchase->provider.' is in '.$provider->mode().' mode now, so it opens nothing.');
+
+            return true;
+        }
+
+        return false;
     }
 
     /** It will not renew; access runs to the end of the period already paid for. */

@@ -38,7 +38,7 @@ class SubscriptionTest extends KioskTestCase
         $next = Carbon::now()->addMonth()->startOfSecond();
         $this->paypal->nextBilling = $next->toIso8601ZuluString();
 
-        $this->assertSame(200, $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'status' => 'ACTIVE', 'start_time' => Carbon::now()->toIso8601ZuluString(), 'billing_info' => ['next_billing_time' => $next->toIso8601ZuluString()]], 'EV-1')->getStatusCode());
+        $this->assertSame(200, $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'plan_id' => 'P-PLAN1', 'status' => 'ACTIVE', 'start_time' => Carbon::now()->toIso8601ZuluString(), 'billing_info' => ['next_billing_time' => $next->toIso8601ZuluString()]], 'EV-1')->getStatusCode());
 
         $purchase = $this->db()->table('kiosk_purchases')->first();
         $this->assertSame('active', $purchase->status);
@@ -72,7 +72,7 @@ class SubscriptionTest extends KioskTestCase
     public function a_second_subscription_to_the_same_product_is_refused(): void
     {
         [$product, $number] = $this->subscribe();
-        $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'status' => 'ACTIVE']);
+        $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'plan_id' => 'P-PLAN1', 'status' => 'ACTIVE']);
 
         $again = $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $product['prices'][0]['id'], 'provider' => 'paypal']);
         $this->assertSame(422, $again->getStatusCode());
@@ -84,7 +84,7 @@ class SubscriptionTest extends KioskTestCase
         [, $number] = $this->subscribe();
         $this->paypal->verification = 'FAILURE';
 
-        $this->assertSame(400, $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'status' => 'ACTIVE'])->getStatusCode());
+        $this->assertSame(400, $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'plan_id' => 'P-PLAN1', 'status' => 'ACTIVE'])->getStatusCode());
         $this->assertSame('pending', $this->db()->table('kiosk_purchases')->value('status'));
         $this->assertSame(0, $this->db()->table('kiosk_webhook_events')->count());
     }
@@ -93,7 +93,7 @@ class SubscriptionTest extends KioskTestCase
     public function a_refunded_sale_ends_access_now(): void
     {
         [, $number] = $this->subscribe();
-        $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'status' => 'ACTIVE']);
+        $this->webhook('BILLING.SUBSCRIPTION.ACTIVATED', ['id' => 'I-SUB1', 'custom_id' => $number, 'plan_id' => 'P-PLAN1', 'status' => 'ACTIVE']);
         $this->webhook('PAYMENT.SALE.COMPLETED', ['id' => 'SALE-1', 'billing_agreement_id' => 'I-SUB1', 'amount' => ['total' => '5.00', 'currency' => 'USD']]);
 
         $this->webhook('PAYMENT.SALE.REFUNDED', ['id' => 'REF-1', 'sale_id' => 'SALE-1', 'amount' => ['total' => '5.00', 'currency' => 'USD']]);

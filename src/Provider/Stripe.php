@@ -307,7 +307,9 @@ class Stripe implements Provider, WebhookProvider
         $product = $to->product ?? Product::query()->findOrFail($to->product_id);
         $done = $this->api->call('POST', '/v1/subscriptions/'.rawurlencode((string) $purchase->provider_ref), [
             'items' => [['id' => $item, 'price' => $this->price($to, $product)]],
-            'proration_behavior' => 'create_prorations',
+            // Charged now, or not switched: a bigger plan is paid before it's used.
+            'proration_behavior' => 'always_invoice',
+            'payment_behavior' => 'error_if_incomplete',
             'metadata' => ['kiosk_number' => $purchase->number, 'kiosk_price_id' => (string) $to->id],
         ], 'kiosk-switch-'.$purchase->number.'-'.$to->id, $purchase->mode);
 
@@ -347,7 +349,10 @@ class Stripe implements Provider, WebhookProvider
         switch ((string) ($event['type'] ?? '')) {
             case 'checkout.session.completed':
             case 'checkout.session.async_payment_succeeded':
-                if (($purchase = $this->byNumber($o['client_reference_id'] ?? $o['metadata']['kiosk_number'] ?? null)) && $purchase->status === Purchase::PENDING) {
+                // 🚨 Only the session Kiosk made: a Payment Link or another
+                // checkout on the same account can carry our number too.
+                if (($purchase = $this->byNumber($o['client_reference_id'] ?? $o['metadata']['kiosk_number'] ?? null))
+                    && $purchase->status === Purchase::PENDING && ($o['id'] ?? null) === $purchase->provider_ref) {
                     $this->applySession($purchase, $o);
                 }
                 break;

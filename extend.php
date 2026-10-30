@@ -100,6 +100,7 @@ return [
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
+        (new Extend\Event())->listen(\Flarum\Tags\Event\DiscussionWasTagged::class, \Ernestdefoe\Kiosk\Listener\SpendCreditOnRetag::class),
         // Paid actions in a tag: posting (credits or a pass), bumping, tipping.
         new Kiosk\UnlockType('post', \Ernestdefoe\Kiosk\Unlock\PostInTagUnlock::class),
         new Kiosk\UnlockType('bump', \Ernestdefoe\Kiosk\Unlock\BumpUnlock::class),
@@ -173,7 +174,8 @@ return [
 
     new Extend\ApiResource(Api\Resource\PurchaseResource::class),
 
-    (new Extend\Notification())->type(PurchaseBlueprint::class, ['alert', 'email']),
+    (new Extend\Notification())->type(PurchaseBlueprint::class, ['alert', 'email'])
+        ->beforeSending(\Ernestdefoe\Kiosk\Listener\WithholdPaidPosts::class),
 
     (new Extend\Event())->listen(Deserializing::class, HideSecrets::class),
 

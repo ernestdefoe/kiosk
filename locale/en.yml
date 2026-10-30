@@ -123,7 +123,7 @@ ernestdefoe-kiosk:
       remove_seat: "Take back {name}'s seat"
       switch_label: Switch plan
       switch: Switch plan
-      switch_confirm_stripe: "Switch to this plan? It starts now, and the difference is settled on your next bill."
+      switch_confirm_stripe: "Switch to this plan? It starts now: you're charged the difference today, or credited it on your next bill."
       switch_confirm_paypal: "Switch to this plan? PayPal asks you to approve it, and your next bill is at the new price."
     notifications:
       receipt: Your purchase of {product} is complete
@@ -150,12 +150,14 @@ ernestdefoe-kiosk:
       provider_unreachable: We couldn't reach the payment provider. Try again in a moment.
       provider_refused: The payment provider couldn't start the payment. The forum's admin has been told.
       coupon: That code isn't valid for this.
+      coupon_used: You've already used that code.
       no_such_user: There's no member with that username.
       no_gift: This can't be given as a gift.
       no_seats: This purchase has no seats to give.
       seat_taken: That member already has a seat.
       seats_full: Every seat is taken. Remove someone first.
       cannot_switch: You can't switch to that plan.
+      switch_seats_paypal: "PayPal can't add seats to a plan you already have. Stop renewing this one, and buy the bigger plan when it ends."
 
   admin:
     permissions:

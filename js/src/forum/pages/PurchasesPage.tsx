@@ -87,8 +87,7 @@ export default class PurchasesPage extends Page {
           </span>
         </div>
         <p className="KioskPurchase-terms">
-          {p.provider === 'grant' && !p.couponCode ? t('forum.purchases.gift') : priceLabel(p)}
-          {' · '}
+          {p.role === 'seat' ? null : [p.provider === 'grant' && !p.couponCode ? t('forum.purchases.gift') : priceLabel(p), ' · ']}
           {this.when(p)}
         </p>
         {this.whose(p)}

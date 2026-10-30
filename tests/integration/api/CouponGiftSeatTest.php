@@ -168,7 +168,7 @@ class CouponGiftSeatTest extends KioskTestCase
     }
 
     #[Test]
-    public function stripe_switches_plan_at_once_with_proration(): void
+    public function stripe_switches_plan_at_once_and_charges_the_difference(): void
     {
         $product = $this->product([['type' => 'group', 'targetId' => self::GOLD]], [
             ['kind' => 'recurring', 'amount' => '5', 'currency' => 'USD', 'interval' => 'month'],
@@ -182,7 +182,9 @@ class CouponGiftSeatTest extends KioskTestCase
         $this->assertSame('year', $this->json($switched)['data']['interval']);
 
         $update = collect($this->stripe->calls)->last(fn ($c) => $c['method'] === 'POST' && $c['path'] === '/v1/subscriptions/sub_1');
-        $this->assertSame('create_prorations', $update['params']['proration_behavior']);
+        // Charged now, so a bigger plan is paid for before it's used.
+        $this->assertSame('always_invoice', $update['params']['proration_behavior']);
+        $this->assertSame('error_if_incomplete', $update['params']['payment_behavior']);
         $this->assertSame('si_1', $update['params']['items'][0]['id']);
     }
 

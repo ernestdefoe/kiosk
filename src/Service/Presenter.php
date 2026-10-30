@@ -102,6 +102,9 @@ class Presenter
         $person = fn ($id) => ($u = $people->get($id)) ? ['id' => (int) $u->id, 'username' => (string) $u->username, 'displayName' => (string) $u->display_name] : null;
         $names = $this->names($purchases->flatMap(fn (Purchase $p) => $p->entitlements->map(fn (Entitlement $e) => [$e->type, $e->target_id])));
 
+        // A seat holder sees what they have, not what the owner paid.
+        $private = fn (Purchase $p) => $viewer && $p->user_id !== (int) $viewer->id && $p->gifted_by !== (int) $viewer->id;
+
         return $purchases->map(fn (Purchase $p) => [
             'id' => $p->id,
             'priceId' => $p->price_id,
@@ -109,13 +112,13 @@ class Presenter
             'giftedBy' => $p->gifted_by ? $person($p->gifted_by) : null,
             'giftedTo' => $p->gifted_by ? $person($p->user_id) : null,
             'owner' => $viewer && $p->user_id !== (int) $viewer->id ? $person($p->user_id) : null,
-            'couponCode' => $p->coupon_code,
+            'couponCode' => $private($p) ? null : $p->coupon_code,
             'seats' => $p->seats,
             'seatHolders' => $seats->get($p->id, Collection::make())->map(fn ($s) => $person((int) $s->user_id))->filter()->values()->all(),
             'number' => $p->number,
             'productId' => $p->product_id,
             'productName' => $p->product_name,
-            'amountCents' => $p->amount_cents,
+            'amountCents' => $private($p) ? null : $p->amount_cents,
             'currency' => $p->currency,
             'kind' => $p->kind,
             'interval' => $p->interval,
@@ -137,7 +140,7 @@ class Presenter
                 'label' => $names[$e->type][$e->target_id]['label'] ?? null,
                 'url' => $names[$e->type][$e->target_id]['url'] ?? null,
             ])->values()->all(),
-            'payments' => $p->relationLoaded('payments') ? $p->payments->map(fn ($pay) => [
+            'payments' => $p->relationLoaded('payments') && ! $private($p) ? $p->payments->map(fn ($pay) => [
                 'id' => $pay->id,
                 'amountCents' => $pay->amount_cents,
                 'currency' => $pay->currency,

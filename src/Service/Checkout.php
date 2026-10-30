@@ -94,6 +94,13 @@ class Checkout
             throw $this->error('too_many');
         }
 
+        // 🚨 A free trial once per member per product: cancelling during it
+        // and subscribing again pays from the start.
+        if ($price->trial_days > 0 && Purchase::query()->where('user_id', $recipient->id)->where('product_id', $product->id)
+            ->where('kind', Price::RECURRING)->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED])->exists()) {
+            $price->trial_days = 0; // this checkout only; never saved
+        }
+
         $purchase = Purchase::start($recipient, $price, $product, $provider->key(), $provider->mode());
         if ($recipient !== $actor) {
             $purchase->gifted_by = $actor->id;
@@ -108,17 +115,30 @@ class Checkout
         }
 
         $code = trim((string) ($options['coupon'] ?? ''));
+        $coupon = $code !== '' ? $this->coupon($code, $actor) : null;
         if ($code !== '') {
-            $discounted = $this->coupon($code, $actor)?->apply($price);
+            $discounted = $coupon?->apply($price);
             // 🚨 A free subscription would never renew through a provider.
-            if ($discounted === null || ($discounted === 0 && $price->isRecurring())) {
+            if (! $coupon || $discounted === null || ($discounted === 0 && $price->isRecurring())) {
                 throw $this->error('coupon');
             }
+            // Once per member (counting gifts they bought).
+            if (Purchase::query()->where('coupon_code', $coupon->code)->whereNot('status', Purchase::EXPIRED)
+                ->where(fn ($q) => $q->where('user_id', $actor->id)->orWhere('gifted_by', $actor->id))->exists()) {
+                throw $this->error('coupon_used');
+            }
             $purchase->amount_cents = $discounted;
-            $purchase->coupon_code = strtoupper($code);
+            $purchase->coupon_code = $coupon->code;
         }
 
         $this->applyContext($purchase, $product, $options['context'] ?? null);
+
+        // 🚨 Take one use now, in one statement, so checkouts started at once
+        // or before anyone pays can't go past the limit. Given back if the
+        // checkout fails or is abandoned (Coupon::release).
+        if ($coupon && ! $coupon->reserve()) {
+            throw $this->error('coupon');
+        }
 
         // Nothing to pay: open it now, with no trip to a provider.
         if ($purchase->amount_cents === 0) {
@@ -141,6 +161,7 @@ class Checkout
         } catch (\Throwable $e) {
             // Nothing was charged; don't leave a row that looks like a sale.
             $purchase->delete();
+            Coupon::release($coupon?->code);
 
             throw $e;
         }

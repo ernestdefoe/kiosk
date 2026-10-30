@@ -119,6 +119,13 @@ class Access
         $this->cache->forget($this->key($userId));
     }
 
+    /** Drop this process's memo only (a queue worker, between jobs). */
+    public function flush(): void
+    {
+        $this->memo = [];
+        $this->tagGroups = null;
+    }
+
     public function forgetTagGroups(): void
     {
         $this->tagGroups = null;

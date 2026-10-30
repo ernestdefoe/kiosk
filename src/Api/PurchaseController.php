@@ -99,6 +99,12 @@ class PurchaseController implements RequestHandlerInterface
             $to = Price::query()->whereNull('archived_at')->where('product_id', $purchase->product_id)->find((int) ($this->body($request)['priceId'] ?? 0));
             $provider = $this->providers->get($purchase->provider);
 
+            // 🚨 PayPal bills a new plan from the next cycle: more seats now
+            // would be used before they're paid for. Stripe charges at once.
+            if ($to && $purchase->provider === 'paypal' && (int) $to->seats > $purchase->seats) {
+                throw new ValidationException(['purchase' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.switch_seats_paypal')]);
+            }
+
             if (! $to || ! $to->isRecurring() || $to->id === $purchase->price_id || $purchase->status !== Purchase::ACTIVE || $purchase->cancel_at_period_end || ! $provider || ! $provider->supports($to)) {
                 throw new ValidationException(['purchase' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.cannot_switch')]);
             }

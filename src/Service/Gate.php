@@ -60,6 +60,13 @@ class Gate
         $this->cache->forget(self::KEY);
     }
 
+    /** Drop this process's memo only (a queue worker, between jobs). */
+    public function flush(): void
+    {
+        $this->sold = null;
+        $this->tagsOf = [];
+    }
+
     /** Teaser tags this person hasn't bought. @return list<int> */
     public function lockedTagIds(User $actor): array
     {

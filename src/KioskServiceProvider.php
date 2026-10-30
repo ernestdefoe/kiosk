@@ -24,4 +24,18 @@ class KioskServiceProvider extends AbstractServiceProvider
         $this->container->singleton(Service\Gate::class);
         $this->container->singleton(Service\Credits::class);
     }
+
+    public function boot(\Illuminate\Contracts\Events\Dispatcher $events): void
+    {
+        // 🚨 A queue worker runs for days: each job starts from what's sold
+        // and who bought it now, not when the worker started.
+        // Cleared in place: policies and listeners hold these same instances.
+        $events->listen(\Illuminate\Queue\Events\JobProcessing::class, function (): void {
+            foreach ([Access::class, Service\Gate::class, Service\Credits::class] as $memo) {
+                if ($this->container->resolved($memo)) {
+                    $this->container->make($memo)->flush();
+                }
+            }
+        });
+    }
 }

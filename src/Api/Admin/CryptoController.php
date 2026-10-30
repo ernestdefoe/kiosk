@@ -101,10 +101,13 @@ class CryptoController implements RequestHandlerInterface
         [$state, $expires, $server] = array_pad(explode('|', (string) $this->settings->get('ernestdefoe-kiosk.btcpay_state_secret'), 3), 3, '');
         $given = (string) ($request->getQueryParams()['state'] ?? '');
 
-        // Single use, fifteen minutes.
+        // Single use, fifteen minutes. A wrong state leaves the right one
+        // alone, so a stranger can't spoil the admin's connect.
+        if ($state === '' || ! hash_equals($state, $given)) {
+            return new RedirectResponse($admin.'&btcpay=expired');
+        }
         $this->settings->delete('ernestdefoe-kiosk.btcpay_state_secret');
-
-        if ($state === '' || ! hash_equals($state, $given) || (int) $expires < time()) {
+        if ((int) $expires < time()) {
             return new RedirectResponse($admin.'&btcpay=expired');
         }
 

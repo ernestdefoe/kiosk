@@ -51,6 +51,12 @@ class Credits
         $this->cache->forget(self::KEY);
     }
 
+    /** Drop this process's memo only (a queue worker, between jobs). */
+    public function flush(): void
+    {
+        $this->tags = null;
+    }
+
     /** Tags where posting costs something and this person can't post right now. @return list<int> */
     public function postLockedTags(User $actor): array
     {

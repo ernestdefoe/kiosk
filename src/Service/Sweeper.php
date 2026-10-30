@@ -41,11 +41,19 @@ class Sweeper
         $out['closed'] = $this->fulfilment->closeDue();
 
         // 🚨 A crypto payment can take hours to confirm: those wait two days.
-        $out['expired'] = Purchase::query()
+        $abandoned = Purchase::query()
             ->where('status', Purchase::PENDING)
             ->where('created_at', '<', $now->copy()->subHours(self::ABANDONED_HOURS))
             ->where(fn ($q) => $q->whereNotIn('provider', ['btcpay', 'nowpayments'])->orWhere('created_at', '<', $now->copy()->subHours(48)))
-            ->update(['status' => Purchase::EXPIRED, 'updated_at' => $now]);
+            ->limit(500)->get(['id', 'coupon_code']);
+        $out['expired'] = 0;
+        foreach ($abandoned as $purchase) {
+            // Only the row that really expired gives its coupon use back.
+            if (Purchase::query()->whereKey($purchase->id)->where('status', Purchase::PENDING)->update(['status' => Purchase::EXPIRED, 'updated_at' => $now])) {
+                $out['expired']++;
+                \Ernestdefoe\Kiosk\Model\Coupon::release($purchase->coupon_code);
+            }
+        }
 
         // Past the period and the grace with no renewal: it is over.
         $graceEnd = $now->copy()->subDays($this->fulfilment->graceDays());
