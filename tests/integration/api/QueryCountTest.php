@@ -16,8 +16,11 @@ class QueryCountTest extends KioskTestCase
     {
         $now = Carbon::now();
         for ($i = 100; $i < 100 + $count; $i++) {
-            $this->db()->table('discussions')->insert(['id' => $i, 'title' => "Paid $i", 'slug' => "paid-$i", 'user_id' => 1, 'created_at' => $now, 'last_posted_at' => $now, 'comment_count' => 1, 'first_post_id' => $i, 'last_post_id' => $i, 'last_post_number' => 1]);
+            // Discussion, then its post, then the discussion's pointers: the
+            // foreign keys run both ways (MySQL and PostgreSQL check them).
+            $this->db()->table('discussions')->insert(['id' => $i, 'title' => "Paid $i", 'slug' => "paid-$i", 'user_id' => 1, 'created_at' => $now, 'last_posted_at' => $now, 'comment_count' => 1, 'last_post_number' => 1]);
             $this->db()->table('posts')->insert(['id' => $i, 'discussion_id' => $i, 'user_id' => 1, 'type' => 'comment', 'content' => '<t>Secret '.$i.'</t>', 'number' => 1, 'created_at' => $now]);
+            $this->db()->table('discussions')->where('id', $i)->update(['first_post_id' => $i, 'last_post_id' => $i]);
             $this->db()->table('discussion_tag')->insert(['discussion_id' => $i, 'tag_id' => self::LOUNGE]);
         }
     }
@@ -48,6 +51,7 @@ class QueryCountTest extends KioskTestCase
         $one = ['guest' => $this->queries(null, '/discussions', $query(1)), 'member' => $this->queries(2, '/discussions', $query(1))];
 
         $this->db()->table('discussion_tag')->where('discussion_id', '>=', 100)->delete();
+        $this->db()->table('discussions')->where('id', '>=', 100)->update(['first_post_id' => null, 'last_post_id' => null]);
         $this->db()->table('posts')->where('id', '>=', 100)->delete();
         $this->db()->table('discussions')->where('id', '>=', 100)->delete();
         $this->seed(20);

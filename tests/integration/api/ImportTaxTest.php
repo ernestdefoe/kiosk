@@ -13,6 +13,12 @@ class ImportTaxTest extends KioskTestCase
 {
     private function floxum(): void
     {
+        // 🚨 It adds floxum's columns; on MySQL and MariaDB that commits the
+        // test's transaction and leaks rows into every later test.
+        if (! in_array($this->db()->getDriverName(), ['sqlite', 'pgsql'], true)) {
+            $this->markTestSkipped('Schema changes inside a test end its transaction on '.$this->db()->getDriverName().'.');
+        }
+
         $schema = $this->db()->getSchemaBuilder();
         $schema->table('groups', fn (Blueprint $t) => $t->string('blomstra_pta_stripe_product_id')->nullable());
         $schema->table('tags', function (Blueprint $t) {

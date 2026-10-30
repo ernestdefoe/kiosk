@@ -98,7 +98,7 @@ class Presenter
         $ids = $seats->flatten()->pluck('user_id')
             ->merge($purchases->pluck('gifted_by')->filter())
             ->merge($purchases->filter(fn (Purchase $p) => $p->gifted_by || ($viewer && $p->user_id !== (int) $viewer->id))->pluck('user_id'))->unique()->values();
-        $people = $ids->isEmpty() ? Collection::make() : User::query()->whereIn('id', $ids)->get(['id', 'username', 'display_name'])->keyBy('id');
+        $people = $ids->isEmpty() ? Collection::make() : User::query()->whereIn('id', $ids)->get()->keyBy('id'); // display_name is worked out (nicknames), not a column
         $person = fn ($id) => ($u = $people->get($id)) ? ['id' => (int) $u->id, 'username' => (string) $u->username, 'displayName' => (string) $u->display_name] : null;
         $names = $this->names($purchases->flatMap(fn (Purchase $p) => $p->entitlements->map(fn (Entitlement $e) => [$e->type, $e->target_id])));
 

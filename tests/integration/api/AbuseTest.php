@@ -203,12 +203,20 @@ class AbuseTest extends KioskTestCase
         $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
         $found = fn (?int $user, string $q) => count($this->json($this->api('GET', '/discussions', $user, [], ['filter' => ['q' => $q]]))['data'] ?? []);
 
+        // MySQL's fulltext index can't see a test's uncommitted rows, so the
+        // "is found" checks run on SQLite and PostgreSQL only.
+        $sees = in_array($this->db()->getDriverName(), ['sqlite', 'pgsql'], true);
+
         foreach ([null, 2] as $user) {
             $this->assertSame(0, $found($user, 'FINALE-SECRET'), 'a non-buyer can search the hidden text');
-            $this->assertSame(1, $found($user, 'Members only'), 'the title is still searchable');
+            if ($sees) {
+                $this->assertSame(1, $found($user, 'Members only'), 'the title is still searchable');
+            }
         }
         // Moderators with "read paid content" read it all, so they can search it.
-        $this->assertSame(1, $found(self::STAFF, 'FINALE-SECRET'));
+        if ($sees) {
+            $this->assertSame(1, $found(self::STAFF, 'FINALE-SECRET'));
+        }
         // And the teaser still shows outside search.
         $this->assertStringContainsString('Behind the rope', (string) $this->api('GET', '/discussions/1', 2)->getBody());
     }
