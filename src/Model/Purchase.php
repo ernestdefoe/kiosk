@@ -35,6 +35,8 @@ use Illuminate\Support\Str;
  * @property Carbon|null $paid_at
  * @property Carbon|null $ended_at
  * @property Carbon|null $reminded_at
+ * @property string|null $context_type
+ * @property int|null $context_id
  * @property-read User|null $user
  * @property-read Product|null $product
  * @property-read Price|null $price

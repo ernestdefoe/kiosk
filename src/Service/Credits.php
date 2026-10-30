@@ -82,6 +82,7 @@ class Credits
             ->whereIn('kiosk_entitlements.target_id', $tagIds)
             ->join('kiosk_purchases', 'kiosk_purchases.id', '=', 'kiosk_entitlements.purchase_id')
             ->orderBy('kiosk_entitlements.id')
+            ->toBase()
             ->get(['kiosk_entitlements.id', 'kiosk_purchases.kind']);
 
         if ($live->isEmpty()) {

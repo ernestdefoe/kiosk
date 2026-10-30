@@ -23,7 +23,8 @@ class SpendPostingCredit
             return;
         }
 
-        $tags = $event->discussion->tags()->pluck('tags.id')->map(fn ($v) => (int) $v)->all();
+        $tags = resolve(\Illuminate\Database\ConnectionInterface::class)->table('discussion_tag')
+            ->where('discussion_id', $event->discussion->id)->pluck('tag_id')->map(fn ($v) => (int) $v)->all();
         $here = array_values(array_intersect($tags, $paid));
 
         if ($here) {

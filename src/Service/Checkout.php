@@ -122,7 +122,7 @@ class Checkout
         $id = (int) (is_array($context) ? ($context['id'] ?? 0) : 0);
         $discussion = $id ? \Flarum\Discussion\Discussion::query()->whereVisibleTo(User::query()->findOrFail($purchase->user_id))->find($id) : null;
 
-        if (! $discussion || ! array_intersect($tipTags, $discussion->tags()->pluck('tags.id')->map(fn ($v) => (int) $v)->all())) {
+        if (! $discussion || ! array_intersect($tipTags, resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->tagsOf((int) $discussion->id))) {
             throw $this->error('tip_target');
         }
 
