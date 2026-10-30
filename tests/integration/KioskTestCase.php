@@ -29,6 +29,7 @@ abstract class KioskTestCase extends TestCase
 
     protected FakePayPal $paypal;
     protected FakeStripe $stripe;
+    protected FakeCrypto $crypto;
 
     protected function setUp(): void
     {
@@ -72,13 +73,18 @@ abstract class KioskTestCase extends TestCase
 
         $this->paypal = new FakePayPal();
         $this->stripe = new FakeStripe();
+        $this->crypto = new FakeCrypto();
     }
 
     /** Boot the app with PayPal faked. */
     protected function boot(): void
     {
         $this->app()->getContainer()->instance(Client::class, new Client(['handler' => HandlerStack::create(fn ($request) => Create::promiseFor(
-            $request->getUri()->getHost() === 'api.stripe.com' ? ($this->stripe)($request) : ($this->paypal)($request)
+            match (true) {
+                $request->getUri()->getHost() === 'api.stripe.com' => ($this->stripe)($request),
+                str_contains($request->getUri()->getHost(), 'paypal.com') => ($this->paypal)($request),
+                default => ($this->crypto)($request),
+            }
         ))]));
     }
 

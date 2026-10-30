@@ -30,6 +30,8 @@ export interface StripeStatus {
 export interface Overview {
   paypal: PayPalStatus;
   stripe: StripeStatus;
+  btcpay: CryptoStatus['btcpay'];
+  nowpayments: CryptoStatus['nowpayments'];
   webhookUrl: string;
   stripeWebhookUrl: string;
   checklist: { provider: boolean; product: boolean; sale: boolean; scheduler: boolean };
@@ -90,3 +92,13 @@ export interface Coupon {
 export const coupons = () => call<{ data: Coupon[] }>('GET', '/admin/coupons');
 export const createCoupon = (body: Record<string, unknown>) => call<{ data: Coupon }>('POST', '/admin/coupons', body);
 export const deleteCoupon = (id: number) => call<void>('DELETE', `/admin/coupons/${id}`);
+
+export interface CryptoStatus {
+  btcpay: { connected: boolean; url: string | null; storeId: string | null; lastWebhookAt: string | null };
+  nowpayments: { connected: boolean; sandbox: boolean; keyHint: string | null; lastWebhookAt: string | null };
+}
+
+export const connectBtcpay = (url: string) => call<{ data: { url: string } }>('POST', '/admin/btcpay', { url });
+export const connectNowpayments = (body: { apiKey: string; ipnSecret: string; sandbox: boolean }) =>
+  call<{ data: CryptoStatus }>('POST', '/admin/nowpayments', body);
+export const disconnectCrypto = (key: 'btcpay' | 'nowpayments') => call<{ data: CryptoStatus }>('POST', `/admin/${key}/disconnect`);

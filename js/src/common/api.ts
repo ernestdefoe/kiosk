@@ -103,7 +103,7 @@ export interface Person {
 
 export interface StoreMeta {
   owned: number[];
-  providers: { key: string; mode: string }[];
+  providers: { key: string; mode: string; recurring: boolean }[];
   termsUrl: string | null;
 }
 

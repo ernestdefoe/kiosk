@@ -40,9 +40,11 @@ class Sweeper
 
         $out['closed'] = $this->fulfilment->closeDue();
 
+        // 🚨 A crypto payment can take hours to confirm: those wait two days.
         $out['expired'] = Purchase::query()
             ->where('status', Purchase::PENDING)
             ->where('created_at', '<', $now->copy()->subHours(self::ABANDONED_HOURS))
+            ->where(fn ($q) => $q->whereNotIn('provider', ['btcpay', 'nowpayments'])->orWhere('created_at', '<', $now->copy()->subHours(48)))
             ->update(['status' => Purchase::EXPIRED, 'updated_at' => $now]);
 
         // Past the period and the grace with no renewal: it is over.

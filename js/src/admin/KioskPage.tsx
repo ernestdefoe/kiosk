@@ -15,6 +15,7 @@ import type { Overview, PayPalStatus, StripeStatus, WebhookRow } from './api';
 import ProductModal from './ProductModal';
 import GrantModal from './GrantModal';
 import CouponsTab from './CouponsTab';
+import CryptoCards from './CryptoCards';
 import Sortable from './sortable';
 import { TEMPLATES } from './templates';
 
@@ -494,6 +495,7 @@ export default class KioskPage extends ExtensionPage {
       <div className="KioskProviders">
         {this.paypalCard()}
         {this.stripeCard()}
+        <CryptoCards status={{ btcpay: this.overview!.btcpay, nowpayments: this.overview!.nowpayments }} onchange={() => this.loadOverview()} />
       </div>
     );
   }

@@ -63,10 +63,11 @@ class OverviewController implements RequestHandlerInterface
         return new JsonResponse(['data' => [
             'paypal' => self::paypalStatus($this->paypal, $this->settings),
             'stripe' => StripeController::status($this->stripe, $this->settings),
+            ...CryptoController::status(resolve(\Ernestdefoe\Kiosk\Provider\BTCPay::class), resolve(\Ernestdefoe\Kiosk\Provider\NOWPayments::class), $this->settings),
             'webhookUrl' => $this->url->to('api')->route('kiosk.webhooks', ['provider' => 'paypal']),
             'stripeWebhookUrl' => $this->url->to('api')->route('kiosk.webhooks', ['provider' => 'stripe']),
             'checklist' => [
-                'provider' => $this->paypal->isConnected() || $this->stripe->isConnected(),
+                'provider' => $this->paypal->isConnected() || $this->stripe->isConnected() || resolve(\Ernestdefoe\Kiosk\Provider\Providers::class)->ready() !== [],
                 'product' => $hasProduct,
                 'sale' => $hasSale,
                 'scheduler' => $this->settings->get('ernestdefoe-kiosk.last_sweep_at') !== null

@@ -13,12 +13,20 @@ export function buy(product: Product, price: Price, meta: StoreMeta, options: Ch
     return null;
   }
 
-  if (meta.termsUrl || meta.providers.length > 1) {
-    app.modal.show(() => import('./CheckoutModal'), { product, price, meta, options });
+  // Only the providers that can take this price: crypto can't renew a subscription.
+  const usable = { ...meta, providers: meta.providers.filter((p) => price.kind !== 'recurring' || p.recurring) };
+
+  if (!usable.providers.length) {
+    app.alerts.show({ type: 'error' }, app.translator.trans('ernestdefoe-kiosk.forum.errors.provider_unavailable'));
     return null;
   }
 
-  return go(price, meta.providers[0]?.key || 'paypal', options);
+  if (usable.termsUrl || usable.providers.length > 1) {
+    app.modal.show(() => import('./CheckoutModal'), { product, price, meta: usable, options });
+    return null;
+  }
+
+  return go(price, usable.providers[0]?.key || 'paypal', options);
 }
 
 export function go(price: Price, provider: string, options: CheckoutOptions = {}): Promise<void> {

@@ -110,7 +110,8 @@ class PurchasesController implements RequestHandlerInterface
                 // The latest payment: the period they are in now.
                 $payment = $payments->sortByDesc('id')->first();
                 if (! $provider->refund($payment)) {
-                    throw $this->error('refund_failed');
+                    // Crypto can only be sent back from the gateway itself.
+                    throw $this->error($provider instanceof \Ernestdefoe\Kiosk\Provider\Crypto ? 'refund_crypto' : 'refund_failed');
                 }
                 $payment->status = Payment::REFUNDED;
                 $payment->refunded_cents = $payment->amount_cents;

@@ -99,6 +99,8 @@ return [
         ]),
     new Kiosk\Provider('paypal', PayPal::class),
     new Kiosk\Provider('stripe', Stripe::class),
+    new Kiosk\Provider('btcpay', \Ernestdefoe\Kiosk\Provider\BTCPay::class),
+    new Kiosk\Provider('nowpayments', \Ernestdefoe\Kiosk\Provider\NOWPayments::class),
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
@@ -163,10 +165,15 @@ return [
         ->post('/kiosk/admin/coupons', 'kiosk.admin.coupons.create', Api\Admin\CouponsController::class)
         ->delete('/kiosk/admin/coupons/{id:[0-9]+}', 'kiosk.admin.coupons.delete', Api\Admin\CouponsController::class)
         ->post('/kiosk/admin/paypal', 'kiosk.admin.paypal', Api\Admin\PayPalController::class)
-        ->post('/kiosk/admin/stripe', 'kiosk.admin.stripe', Api\Admin\StripeController::class),
+        ->post('/kiosk/admin/stripe', 'kiosk.admin.stripe', Api\Admin\StripeController::class)
+        ->post('/kiosk/admin/btcpay', 'kiosk.admin.btcpay', Api\Admin\CryptoController::class)
+        ->post('/kiosk/admin/btcpay/disconnect', 'kiosk.admin.btcpay.disconnect', Api\Admin\CryptoController::class)
+        ->post('/kiosk/admin/nowpayments', 'kiosk.admin.nowpayments', Api\Admin\CryptoController::class)
+        ->post('/kiosk/admin/nowpayments/disconnect', 'kiosk.admin.nowpayments.disconnect', Api\Admin\CryptoController::class)
+        ->post('/kiosk/btcpay/authorized', 'kiosk.btcpay.authorized', Api\Admin\CryptoController::class),
 
     // Providers cannot send a CSRF token; the signature check stands in for it.
-    (new Extend\Csrf())->exemptRoute('kiosk.webhooks'),
+    (new Extend\Csrf())->exemptRoute('kiosk.webhooks')->exemptRoute('kiosk.btcpay.authorized'),
 
     new Extend\ApiResource(Api\Resource\PurchaseResource::class),
 

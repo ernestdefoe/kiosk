@@ -48,6 +48,18 @@ class Price extends AbstractModel
         'archived_at' => 'datetime',
     ];
 
+    /** A plain monthly price, to ask a provider whether it takes subscriptions at all. */
+    public static function monthly(): self
+    {
+        $price = new self();
+        $price->kind = self::RECURRING;
+        $price->interval = 'month';
+        $price->interval_count = 1;
+        $price->trial_days = 0;
+
+        return $price;
+    }
+
     /** @return BelongsTo<Product, $this> */
     public function product(): BelongsTo
     {

@@ -11,6 +11,8 @@ ernestdefoe-kiosk:
     providers:
       paypal: PayPal
       stripe: Card (Stripe)
+      btcpay: Bitcoin (BTCPay)
+      nowpayments: Crypto (NOWPayments)
     tag_group:
       singular: "{tag} buyer"
       plural: "{tag} buyers"
@@ -166,6 +168,18 @@ ernestdefoe-kiosk:
       payments: Payments
       webhooks: Payment log
       settings: Settings
+    btcpay:
+      help: "Your own BTCPay Server takes Bitcoin and Lightning with no middleman. Enter its address and press Connect: BTCPay asks which store to use, then sends you back. Crypto can't renew by itself, so it's offered for one-time and set-time prices only."
+      url: BTCPay Server address
+      connected_to: "Connected to {url} (store {store})."
+      expired: That took too long, or the link was used already. Press Connect again.
+      failed: BTCPay didn't give Kiosk what it needs. Press Connect again and allow every permission it asks for, for one store.
+    nowpayments:
+      help: "A hosted gateway for 300+ coins. In NOWPayments, open Store settings: copy the API key, and create an IPN secret. Crypto can't renew by itself, so it's offered for one-time and set-time prices only."
+      api_key: API key
+      ipn_secret: IPN secret
+      sandbox: Test mode (NOWPayments sandbox)
+      ok: NOWPayments is connected.
     coupons:
       code: Code
       discount: Discount
@@ -349,6 +363,8 @@ ernestdefoe-kiosk:
       secret_saved: Saved. Leave blank to keep it.
       connect: Connect
       reconnect: Save and reconnect
+      disconnect: Disconnect
+      disconnect_confirm: Disconnect this payment method? Purchases already made keep their access.
       go_live: Switch to live payments
       back_to_test: Switch back to test mode
       ok: Connected. Kiosk set up PayPal's notifications for you.
@@ -397,10 +413,14 @@ ernestdefoe-kiosk:
       provider_unreachable: Kiosk couldn't reach the payment provider. Try again in a moment.
       nothing_to_refund: There's no payment to refund.
       refund_failed: The payment provider didn't accept the refund. Check the payment there.
+      refund_crypto: "Crypto can't be refunded from here. Send it back from your BTCPay or NOWPayments dashboard, then press End."
       stripe_key: "That isn't a Stripe secret key. It starts with sk_test_ or sk_live_."
       coupon_code: "A code is 3 to 40 letters, numbers, dashes or underscores."
       coupon_taken: That code is already in use.
       coupon_value: Enter a discount from 1 to 100 percent, or an amount above zero.
+      btcpay_url: "Enter your BTCPay Server's https:// address."
+      nowpayments_keys: Paste both the API key and the IPN secret.
+      nowpayments_rejected: NOWPayments didn't accept that API key. Check it, and whether it's for the sandbox.
 
   # Emails. {url} links to the member's purchases.
   email:
