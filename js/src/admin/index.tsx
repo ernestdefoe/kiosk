@@ -13,6 +13,11 @@ app.initializers.add('ernestdefoe-kiosk', () => {
       { icon: 'fas fa-store', label: app.translator.trans('ernestdefoe-kiosk.admin.permissions.read_paid'), permission: 'kiosk.readPaid' },
       'moderate',
       60
+    )
+    .registerPermission(
+      { icon: 'fas fa-eye-slash', label: app.translator.trans('ernestdefoe-kiosk.admin.permissions.ad_free'), permission: 'kiosk.adFree' },
+      'view',
+      -10
     );
 
   // 🚨 Both editors are lazy chunks in Flarum 2: extend them by module name,

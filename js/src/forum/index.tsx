@@ -8,13 +8,15 @@ import { PurchaseNotification } from './notifications';
 import lockedTags from './lockedTags';
 import teaser from './teaser';
 import tagActions from './tagActions';
+import ads from './ads';
 
 export { default as ProductCard } from './components/ProductCard';
 export { default as LockedNotice } from './components/LockedNotice';
 
 /*
  * Everything here runs on every page for every visitor, so it is only the
- * wiring: three routes, a nav link, a dropdown link and the notification.
+ * wiring: three routes, a nav link, a dropdown link, the notification and
+ * the admin's ads (nothing at all when there are none).
  * The pages are their own chunks, fetched the first time one is opened.
  */
 app.initializers.add('ernestdefoe-kiosk', () => {
@@ -28,6 +30,7 @@ app.initializers.add('ernestdefoe-kiosk', () => {
   lockedTags();
   teaser();
   tagActions();
+  ads();
 
   extend(IndexSidebar.prototype, 'navItems', function (items) {
     if (app.forum.attribute('kioskShowNav') === false) return;

@@ -425,3 +425,87 @@ span.KioskChip,
     color: var(--text-color);
   }
 }
+
+// ─── Ads ──────────────────────────────────────────────────────────────────
+// A plain box in every spot: centered, never wider than its column, and
+// labelled. Colours come from the forum's properties so themes and dark
+// mode carry over; the link selectors are specific enough to beat a
+// theme's own link colours.
+
+.KioskAd {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin: 16px auto;
+  text-align: center;
+  color: var(--muted-color);
+  list-style: none;
+
+  .KioskAd-meta {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 4px;
+    font-size: 11px;
+    line-height: 1.4;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .KioskAd-label {
+    color: var(--muted-color);
+  }
+
+  a.KioskAd-remove,
+  a.KioskAd-remove:hover,
+  a.KioskAd-remove:focus {
+    color: var(--muted-color);
+    text-decoration: underline;
+  }
+
+  .KioskAd-image,
+  .KioskAd-html {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+  }
+
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    margin: 0 auto;
+    border-radius: var(--border-radius);
+  }
+}
+
+.KioskAd--footer {
+  padding: 0 15px;
+}
+
+.KioskAd--sidebar,
+.KioskAd--discussion_sidebar {
+  margin: 20px 0;
+}
+
+// The discussion list's own items keep their look; the ad sits between them.
+.DiscussionList-discussions > .KioskAd--between_discussions {
+  padding: 8px 0;
+}
+
+.PostStream > .KioskAd--between_posts,
+.PostStream-afterFirstPost .KioskAd {
+  margin: 20px 0;
+}
+
+// On phones the sidebar folds into a menu: no ads there.
+@media @phone {
+  .KioskAd--sidebar,
+  .KioskAd--discussion_sidebar {
+    display: none;
+  }
+
+  .DiscussionList-discussions > .KioskAd--between_discussions {
+    padding: 8px 15px;
+  }
+}

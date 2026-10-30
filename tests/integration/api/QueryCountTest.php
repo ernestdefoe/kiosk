@@ -70,4 +70,18 @@ class QueryCountTest extends KioskTestCase
         $one = $this->queries(2, '/posts', $query(1));
         $this->assertSame($one, $this->queries(2, '/posts', $query(20)), 'queries grew with the list');
     }
+
+    #[Test]
+    public function ads_cost_no_query_on_a_page_with_one_or_twenty(): void
+    {
+        $none = ['guest' => $this->queries(null, '', []), 'member' => $this->queries(2, '', [])];
+
+        $this->api('POST', '/kiosk/admin/ads', 1, ['name' => 'Ad', 'location' => 'sidebar', 'kind' => 'html', 'html' => 'x']);
+        $this->assertSame($none, ['guest' => $this->queries(null, '', []), 'member' => $this->queries(2, '', [])], 'one ad added queries');
+
+        for ($i = 0; $i < 19; $i++) {
+            $this->api('POST', '/kiosk/admin/ads', 1, ['name' => 'Ad', 'location' => $i % 2 ? 'footer' : 'between_posts', 'kind' => 'html', 'html' => 'x', 'audience' => $i % 3 ? 'everyone' : 'members']);
+        }
+        $this->assertSame($none, ['guest' => $this->queries(null, '', []), 'member' => $this->queries(2, '', [])], 'twenty ads added queries');
+    }
 }

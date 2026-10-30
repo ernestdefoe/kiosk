@@ -54,6 +54,19 @@ return [
 
     new Kiosk\UnlockType('group', GroupUnlock::class),
     new Kiosk\UnlockType('discussion', \Ernestdefoe\Kiosk\Unlock\DiscussionUnlock::class),
+    // "No ads", for any product to include. See Service\Ads.
+    new Kiosk\UnlockType('ads', \Ernestdefoe\Kiosk\Unlock\AdFreeUnlock::class),
+
+    // The admin's ads: the ones this visitor may see ride in the forum
+    // payload (cached; no query), so a page never waits on a second request.
+    (new Extend\ApiResource(ForumResource::class))
+        ->fields(fn () => [
+            Schema\Arr::make('kioskAds')
+                ->get(fn ($forum, Context $context) => resolve(\Ernestdefoe\Kiosk\Service\Ads::class)->forActor($context->getActor())),
+            Schema\Str::make('kioskAdFreeProduct')
+                ->nullable()
+                ->get(fn ($forum, Context $context) => resolve(\Ernestdefoe\Kiosk\Service\Ads::class)->offer($context->getActor())),
+        ]),
 
     (new Extend\Event())->listen(\Flarum\Discussion\Event\Started::class, \Ernestdefoe\Kiosk\Listener\SpendPostingCredit::class),
 
@@ -167,6 +180,13 @@ return [
         ->post('/kiosk/admin/grants', 'kiosk.admin.grants', Api\Admin\PurchasesController::class)
         ->get('/kiosk/admin/webhooks', 'kiosk.admin.webhooks', Api\Admin\WebhooksController::class)
         ->post('/kiosk/admin/webhooks/{id:[0-9]+}/replay', 'kiosk.admin.webhooks.replay', Api\Admin\WebhooksController::class)
+        ->get('/kiosk/admin/ads', 'kiosk.admin.ads', Api\Admin\AdsController::class)
+        ->post('/kiosk/admin/ads', 'kiosk.admin.ads.create', Api\Admin\AdsController::class)
+        ->patch('/kiosk/admin/ads/{id:[0-9]+}', 'kiosk.admin.ads.update', Api\Admin\AdsController::class)
+        ->delete('/kiosk/admin/ads/{id:[0-9]+}', 'kiosk.admin.ads.delete', Api\Admin\AdsController::class)
+        ->post('/kiosk/admin/ads/{id:[0-9]+}/image', 'kiosk.admin.ads.image', Api\Admin\AdsController::class)
+        ->post('/kiosk/ads/seen', 'kiosk.ads.seen', Api\AdsController::class)
+        ->get('/kiosk/ads/{id:[0-9]+}/go', 'kiosk.ads.go', Api\AdsController::class)
         ->get('/kiosk/admin/coupons', 'kiosk.admin.coupons', Api\Admin\CouponsController::class)
         ->post('/kiosk/admin/coupons', 'kiosk.admin.coupons.create', Api\Admin\CouponsController::class)
         ->delete('/kiosk/admin/coupons/{id:[0-9]+}', 'kiosk.admin.coupons.delete', Api\Admin\CouponsController::class)
@@ -198,5 +218,11 @@ return [
     (new Extend\Settings())
         ->default('ernestdefoe-kiosk.grace_days', 3)
         ->default('ernestdefoe-kiosk.show_nav', true)
-        ->serializeToForum('kioskShowNav', 'ernestdefoe-kiosk.show_nav', 'boolval'),
+        ->default('ernestdefoe-kiosk.ads_every_posts', 5)
+        ->default('ernestdefoe-kiosk.ads_every_discussions', 10)
+        ->default('ernestdefoe-kiosk.ads_label', true)
+        ->serializeToForum('kioskShowNav', 'ernestdefoe-kiosk.show_nav', 'boolval')
+        ->serializeToForum('kioskAdsEveryPosts', 'ernestdefoe-kiosk.ads_every_posts', 'intval')
+        ->serializeToForum('kioskAdsEveryDiscussions', 'ernestdefoe-kiosk.ads_every_discussions', 'intval')
+        ->serializeToForum('kioskAdsLabel', 'ernestdefoe-kiosk.ads_label', 'boolval'),
 ];

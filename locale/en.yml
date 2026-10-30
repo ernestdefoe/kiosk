@@ -8,6 +8,8 @@ ernestdefoe-kiosk:
       post: Posting in a tag
       bump: Bumps in a tag
       tip: Tips in a tag
+      ads: Remove ads
+    ad_free: No ads
     providers:
       paypal: PayPal
       stripe: Card (Stripe)
@@ -42,6 +44,9 @@ ernestdefoe-kiosk:
       every_n_year: "{amount} every {count} years"
 
   forum:
+    ads:
+      label: Sponsored
+      remove: Remove ads
     nav: Store
     store:
       title: Store
@@ -162,11 +167,13 @@ ernestdefoe-kiosk:
   admin:
     permissions:
       read_paid: Read paid content without buying
+      ad_free: Never see ads
     tabs:
       overview: Overview
       products: Products
       purchases: Purchases
       coupons: Coupons
+      ads: Ads
       payments: Payments
       webhooks: Payment log
       settings: Settings
@@ -182,6 +189,65 @@ ernestdefoe-kiosk:
       ipn_secret: IPN secret
       sandbox: Test mode (NOWPayments sandbox)
       ok: NOWPayments is connected.
+    ads:
+      intro: "Your own ads, in the spots below. Each page shows one ad per spot, picked again when the visitor moves on. Members who bought \"Remove ads\", and groups with the \"Never see ads\" permission, see none."
+      new: New ad
+      edit: Edit ad
+      delete: Delete ad
+      delete_confirm: "Delete {name}? Its counts are deleted too."
+      empty: No ads yet.
+      name: Name
+      name_placeholder: "Spring sale banner"
+      location: Where
+      kind: Type
+      kinds:
+        image: A picture with a link
+        html: Code (AdSense or another ad network)
+      image: Picture
+      image_help: PNG, JPEG, GIF or WebP, up to 2 MB. It's stored on your forum, so showing it calls no one else.
+      link: Link
+      alt: Description for screen readers
+      html: Code
+      html_help: "Runs as-is for everyone who sees the ad, scripts included. Ad networks load their own files and may set cookies, so mention them in your privacy policy."
+      audience: Who sees it
+      audiences:
+        everyone: Everyone
+        guests: Guests only
+        members: Members only
+      starts: Starts
+      ends: Ends
+      runs: Runs
+      always: Always
+      active: Show this ad
+      off: Switched off
+      save: Save ad
+      seen: Seen
+      clicks: Clicks
+      settings: Ad settings
+      every_posts: Between posts, show an ad after every this many posts
+      every_discussions: In discussion lists, show an ad after every this many discussions
+      show_label: "Label ads \"Sponsored\""
+      ad_free_help: "To let members pay to remove ads, add \"Remove ads\" to a product on the Products tab. A \"Remove ads\" link then shows on every ad. Admins always see ads, so you can check them."
+      locations:
+        header: Top of every page
+        below_header: Below the page's banner
+        sidebar: Sidebar
+        between_discussions: Between discussions in a list
+        after_first_post: After a discussion's first post
+        between_posts: Between posts
+        discussion_sidebar: Discussion sidebar
+        above_footer: Bottom of every page
+        footer: Footer
+      location_help:
+        header: Above everything else on the page, under the forum's header bar.
+        below_header: Under the welcome banner on the discussion list, or under the title on a discussion.
+        sidebar: Under the menu beside the discussion list. Hidden on phones, where the menu folds away.
+        between_discussions: After every few discussions in the list (set how many below).
+        after_first_post: Right after the opening post of every discussion.
+        between_posts: After every few posts in a discussion (set how many below).
+        discussion_sidebar: Under the reply button and scrubber beside a discussion. Hidden on phones.
+        above_footer: After the page's content, on every page.
+        footer: In the forum's footer, on every page.
     coupons:
       code: Code
       discount: Discount
@@ -398,6 +464,14 @@ ernestdefoe-kiosk:
       stripe_tax_help: "For Stripe checkouts only. Turn on Stripe Tax in your Stripe dashboard first: Stripe then asks buyers for their address and adds the tax on top of your price. Kiosk doesn't work out tax itself; that's up to you."
     errors:
       name: Give the product a name (up to 150 characters).
+      ad_name: Give the ad a name (up to 150 characters).
+      ad_location: Choose where the ad goes.
+      ad_kind: Choose a picture or code.
+      ad_audience: Choose who sees the ad.
+      ad_link: The link must be a web address starting with https:// or http://.
+      ad_html: Paste the ad's code (up to 20,000 characters).
+      ad_dates: The end date must come after the start date.
+      ad_image: Upload a PNG, JPEG, GIF or WebP picture of up to 2 MB.
       unlock_type: Something in "What buying it unlocks" can't be sold on this forum.
       unlocks_required: Pick at least one thing the product unlocks.
       too_many_unlocks: A product can unlock up to 25 things.

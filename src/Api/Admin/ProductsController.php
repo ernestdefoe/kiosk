@@ -51,6 +51,7 @@ class ProductsController implements RequestHandlerInterface
             $this->paidTags->forget();
             resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->forget();
             resolve(\Ernestdefoe\Kiosk\Service\Credits::class)->forget();
+            resolve(\Ernestdefoe\Kiosk\Service\Ads::class)->forget();
 
             return new EmptyResponse(204);
         }

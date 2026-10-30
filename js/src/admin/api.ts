@@ -1,3 +1,4 @@
+import app from 'flarum/admin/app';
 import { call } from '../common/api';
 import type { Product, Purchase } from '../common/api';
 
@@ -102,3 +103,50 @@ export const connectBtcpay = (url: string) => call<{ data: { url: string } }>('P
 export const connectNowpayments = (body: { apiKey: string; ipnSecret: string; sandbox: boolean }) =>
   call<{ data: CryptoStatus }>('POST', '/admin/nowpayments', body);
 export const disconnectCrypto = (key: 'btcpay' | 'nowpayments') => call<{ data: CryptoStatus }>('POST', `/admin/${key}/disconnect`);
+
+/** Where an ad can go, in the order the admin sees them. Mirrors Model\Ad::LOCATIONS. */
+export const LOCATIONS = [
+  'header',
+  'below_header',
+  'sidebar',
+  'between_discussions',
+  'after_first_post',
+  'between_posts',
+  'discussion_sidebar',
+  'above_footer',
+  'footer',
+] as const;
+
+export interface AdRow {
+  id: number;
+  name: string;
+  location: string;
+  kind: 'image' | 'html';
+  imageUrl: string | null;
+  imageWidth: number | null;
+  imageHeight: number | null;
+  linkUrl: string | null;
+  altText: string | null;
+  html: string | null;
+  audience: 'everyone' | 'guests' | 'members';
+  active: boolean;
+  startsAt: string | null;
+  endsAt: string | null;
+  impressions: number;
+  clicks: number;
+}
+
+export const ads = () => call<{ data: AdRow[] }>('GET', '/admin/ads');
+export const saveAd = (body: Record<string, unknown>, id?: number) =>
+  call<{ data: AdRow }>(id ? 'PATCH' : 'POST', id ? `/admin/ads/${id}` : '/admin/ads', body);
+export const deleteAd = (id: number) => call<void>('DELETE', `/admin/ads/${id}`);
+export const uploadAdImage = (id: number, file: File) => {
+  const body = new FormData();
+  body.append('image', file);
+  return app.request<{ data: AdRow }>({
+    method: 'POST',
+    url: app.forum.attribute('apiUrl') + `/kiosk/admin/ads/${id}/image`,
+    body,
+    serialize: (raw: FormData) => raw,
+  });
+};

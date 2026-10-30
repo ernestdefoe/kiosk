@@ -20,6 +20,7 @@ Every product unlocks one or more things, and has one or more prices.
 | **Posting in a tag** | Credits to start discussions in a tag ("pay to post"), for classifieds or job boards. |
 | **Bumps** | Credits to bump your own discussion back to the top. |
 | **Tips** | Members back a discussion with an amount they choose; the total shows on the discussion ("tips and bounties"). |
+| **Remove ads** | No Kiosk ads anywhere on the forum, for as long as the buyer holds it. |
 | **Course, album, social group** | With Syllabus, Atrium or Social Groups installed: a course, an album, or a group people pay to join. |
 
 | Price | How it is paid |
@@ -42,8 +43,9 @@ A price can also be a **team plan**: give it more than one seat, and the buyer h
 - **Sell this** buttons on the group, tag and other extensions' edit screens.
 - **Receipts and reminders** in the bell and by email: purchase complete, a gift, a seat, a renewal coming up, a failed payment, access ended.
 - **Grace days**: a renewal that is a day or two late doesn't lock a paying member out.
+- **Ads**: your own ads in nine spots, with Remove ads for sale (see below).
 - **Moving from floxum/payments**: `php flarum kiosk:import-floxum` (see below).
-- Translatable, works in light and dark mode, and adds about 7 KB (gzipped) to the JavaScript every page loads. The store pages load only when opened.
+- Translatable, works in light and dark mode, and adds about 8 KB (gzipped) to the JavaScript every page loads. The store pages load only when opened.
 
 ## Screenshots
 
@@ -110,11 +112,23 @@ Crypto can't renew by itself, so it is offered for one-time and set-time prices 
 
 > **Crypto hasn't been tested with real payments yet.** It is covered by automated tests against each gateway's documented API. Please [report anything that goes wrong](https://github.com/ernestdefoe/kiosk/issues).
 
+## Ads
+
+Run your own ads on the forum from the **Ads** tab, and let members pay to remove them.
+
+- **Nine spots**: top of every page, below the page's banner, the sidebar, between discussions in a list, after a discussion's first post, between posts, the discussion sidebar, the bottom of every page, and the footer. The first six match Ad Management's zones.
+- **Two kinds**: a picture with a link (uploaded to your forum, so showing it calls no one else), or pasted code for AdSense or another network.
+- **Who and when**: everyone, guests only or members only, with optional start and end dates. Each page shows one ad per spot, picked again when the visitor moves on; between posts and discussions, the ads take turns.
+- **Remove ads**: add *Remove ads* to any product (an ad-free membership, or on top of a supporter tier). Buyers see no ads while they hold it, and every ad shows a "Remove ads" link to that product.
+- **Counts**: how often each ad was seen (at least half on screen) and clicked, per day. No IP addresses or member names are stored.
+- **Light**: the ads a visitor may see come with the page, cached, so a page costs no extra query or request. Seen counts are sent in batches.
+
 ## Permissions
 
 | Permission | Default | What it allows |
 | --- | --- | --- |
 | Read paid content without buying | Moderators | Read paid tags and discussions in full, to moderate them. |
+| Never see ads | Moderators | No Kiosk ads. Admins always see them, so they can check what members see. |
 
 Buying needs a confirmed email address. Products can be limited to some groups (for example, "verified members only").
 

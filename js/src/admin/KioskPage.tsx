@@ -15,12 +15,13 @@ import type { Overview, PayPalStatus, StripeStatus, WebhookRow } from './api';
 import ProductModal from './ProductModal';
 import GrantModal from './GrantModal';
 import CouponsTab from './CouponsTab';
+import AdsTab from './AdsTab';
 import CryptoCards from './CryptoCards';
 import Sortable from './sortable';
 import { TEMPLATES } from './templates';
 
-type Tab = 'overview' | 'products' | 'purchases' | 'coupons' | 'payments' | 'webhooks' | 'settings';
-const TABS: Tab[] = ['overview', 'products', 'purchases', 'coupons', 'payments', 'webhooks', 'settings'];
+type Tab = 'overview' | 'products' | 'purchases' | 'coupons' | 'ads' | 'payments' | 'webhooks' | 'settings';
+const TABS: Tab[] = ['overview', 'products', 'purchases', 'coupons', 'ads', 'payments', 'webhooks', 'settings'];
 
 const PAYPAL_APPS = 'https://developer.paypal.com/dashboard/applications';
 const STRIPE_KEYS = 'https://dashboard.stripe.com/apikeys';
@@ -140,6 +141,8 @@ export default class KioskPage extends ExtensionPage {
         return this.purchasesTab();
       case 'coupons':
         return <CouponsTab products={this.products} />;
+      case 'ads':
+        return this.adsTab();
       case 'payments':
         return this.paymentsTab();
       case 'webhooks':
@@ -775,6 +778,36 @@ export default class KioskPage extends ExtensionPage {
             ))}
           </tbody>
         </table>
+      </div>
+    );
+  }
+
+  // ─── Ads ─────────────────────────────────────────────────────────────────
+
+  adsTab(): Mithril.Children {
+    return (
+      <div>
+        <AdsTab />
+        <div className="Form KioskSettings KioskAds-settings">
+          <h3>{t('admin.ads.settings')}</h3>
+          {this.buildSettingComponent({
+            setting: 'ernestdefoe-kiosk.ads_every_posts',
+            type: 'number',
+            min: 1,
+            max: 100,
+            label: t('admin.ads.every_posts'),
+          })}
+          {this.buildSettingComponent({
+            setting: 'ernestdefoe-kiosk.ads_every_discussions',
+            type: 'number',
+            min: 1,
+            max: 100,
+            label: t('admin.ads.every_discussions'),
+          })}
+          {this.buildSettingComponent({ setting: 'ernestdefoe-kiosk.ads_label', type: 'boolean', label: t('admin.ads.show_label') })}
+          <p className="helpText">{t('admin.ads.ad_free_help')}</p>
+          {this.submitButton()}
+        </div>
       </div>
     );
   }
