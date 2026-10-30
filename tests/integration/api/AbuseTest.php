@@ -159,4 +159,57 @@ class AbuseTest extends KioskTestCase
 
         $this->assertSame([self::STAFF], array_map(fn ($u) => (int) $u->id, $kept), 'only someone who can read it is told');
     }
+
+    #[Test]
+    public function a_checkout_paid_after_it_expired_takes_its_coupon_use_again(): void
+    {
+        $product = $this->product([['type' => 'group', 'targetId' => self::GOLD]], [['kind' => 'recurring', 'amount' => '10.00', 'currency' => 'USD', 'interval' => 'month']]);
+        $this->assertSame(201, $this->api('POST', '/kiosk/admin/coupons', 1, ['code' => 'half', 'kind' => 'percent', 'value' => 50, 'maxUses' => 1])->getStatusCode());
+        $number = $this->json($this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $product['prices'][0]['id'], 'provider' => 'paypal', 'coupon' => 'half']))['data']['number'];
+
+        $this->db()->table('kiosk_purchases')->update(['created_at' => Carbon::now()->subHours(4)]);
+        $this->app()->getContainer()->make(\Ernestdefoe\Kiosk\Service\Sweeper::class)->run();
+        $this->assertSame('expired', $this->db()->table('kiosk_purchases')->value('status'));
+        $this->assertSame(0, (int) $this->db()->table('kiosk_coupons')->value('used_count'));
+
+        // The buyer approves at PayPal late: a real payment, so it opens, and counts.
+        $this->api('POST', '/kiosk/purchases/'.$number.'/confirm', self::BUYER);
+        $this->assertTrue($this->inGold());
+        $this->assertSame('active', $this->db()->table('kiosk_purchases')->value('status'));
+        $this->assertSame(1, (int) $this->db()->table('kiosk_coupons')->value('used_count'));
+        $this->assertSame(422, $this->api('POST', '/kiosk/checkout', 2, ['priceId' => $product['prices'][0]['id'], 'provider' => 'paypal', 'coupon' => 'half'])->getStatusCode());
+    }
+
+    #[Test]
+    public function a_late_payment_whose_coupon_ran_out_meanwhile_opens_nothing(): void
+    {
+        $product = $this->product([['type' => 'group', 'targetId' => self::GOLD]], [['kind' => 'recurring', 'amount' => '10.00', 'currency' => 'USD', 'interval' => 'month']]);
+        $this->assertSame(201, $this->api('POST', '/kiosk/admin/coupons', 1, ['code' => 'half', 'kind' => 'percent', 'value' => 50, 'maxUses' => 1])->getStatusCode());
+        $number = $this->json($this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $product['prices'][0]['id'], 'provider' => 'paypal', 'coupon' => 'half']))['data']['number'];
+        $this->db()->table('kiosk_purchases')->update(['created_at' => Carbon::now()->subHours(4)]);
+        $this->app()->getContainer()->make(\Ernestdefoe\Kiosk\Service\Sweeper::class)->run();
+
+        // Someone else uses the freed use first.
+        $this->db()->table('kiosk_coupons')->update(['used_count' => 1]);
+
+        $this->api('POST', '/kiosk/purchases/'.$number.'/confirm', self::BUYER);
+        $this->assertFalse($this->inGold());
+        $this->assertSame('expired', $this->db()->table('kiosk_purchases')->value('status'));
+    }
+
+    #[Test]
+    public function search_can_t_find_words_in_the_hidden_part_of_a_paid_post(): void
+    {
+        $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+        $found = fn (?int $user, string $q) => count($this->json($this->api('GET', '/discussions', $user, [], ['filter' => ['q' => $q]]))['data'] ?? []);
+
+        foreach ([null, 2] as $user) {
+            $this->assertSame(0, $found($user, 'FINALE-SECRET'), 'a non-buyer can search the hidden text');
+            $this->assertSame(1, $found($user, 'Members only'), 'the title is still searchable');
+        }
+        // Moderators with "read paid content" read it all, so they can search it.
+        $this->assertSame(1, $found(self::STAFF, 'FINALE-SECRET'));
+        // And the teaser still shows outside search.
+        $this->assertStringContainsString('Behind the rope', (string) $this->api('GET', '/discussions/1', 2)->getBody());
+    }
 }

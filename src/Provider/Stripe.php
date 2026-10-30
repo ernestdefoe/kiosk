@@ -234,6 +234,9 @@ class Stripe implements Provider, WebhookProvider
         $start = isset($sub['current_period_start']) ? Carbon::createFromTimestamp((int) $sub['current_period_start']) : Carbon::now();
 
         if (in_array($status, ['active', 'trialing', 'past_due'], true)) {
+            if ($purchase->status === Purchase::EXPIRED) {
+                $this->fulfilment->revive($purchase);
+            }
             if ($purchase->status === Purchase::PENDING) {
                 $this->fulfilment->activate($purchase, $start, $end ?? $purchase->periodEndFrom($start));
                 $purchase->refresh();
@@ -352,7 +355,8 @@ class Stripe implements Provider, WebhookProvider
                 // 🚨 Only the session Kiosk made: a Payment Link or another
                 // checkout on the same account can carry our number too.
                 if (($purchase = $this->byNumber($o['client_reference_id'] ?? $o['metadata']['kiosk_number'] ?? null))
-                    && $purchase->status === Purchase::PENDING && ($o['id'] ?? null) === $purchase->provider_ref) {
+                    && ($o['id'] ?? null) === $purchase->provider_ref
+                    && ($purchase->status === Purchase::PENDING || $this->fulfilment->revive($purchase))) {
                     $this->applySession($purchase, $o);
                 }
                 break;

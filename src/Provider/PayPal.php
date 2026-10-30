@@ -302,6 +302,10 @@ class PayPal implements Provider, WebhookProvider
         $status = (string) ($sub['status'] ?? '');
         $next = isset($sub['billing_info']['next_billing_time']) ? Carbon::parse($sub['billing_info']['next_billing_time']) : null;
 
+        if ($status === 'ACTIVE' && $purchase->status === Purchase::EXPIRED) {
+            $this->fulfilment->revive($purchase);
+        }
+
         if ($status === 'ACTIVE' && $purchase->status !== Purchase::PENDING && ($to = $this->priceOfPlan($purchase, $sub['plan_id'] ?? null))) {
             $this->fulfilment->switchPrice($purchase, $to);
         }
@@ -373,7 +377,8 @@ class PayPal implements Provider, WebhookProvider
                 break;
 
             case 'PAYMENT.CAPTURE.COMPLETED':
-                if ($purchase = $this->byNumber($r['custom_id'] ?? null)) {
+                // Only a capture of the order Kiosk created (its "up" link).
+                if (($purchase = $this->byNumber($r['custom_id'] ?? null)) && $this->orderOf($r) === $purchase->provider_ref) {
                     $this->captureCompleted($purchase, $r);
                 }
                 break;
@@ -465,6 +470,18 @@ class PayPal implements Provider, WebhookProvider
     }
 
     /** The capture a refund belongs to, from its "up" link. @param array<string, mixed> $r */
+    /** @param array<string, mixed> $r the order a capture belongs to, from its "up" link */
+    private function orderOf(array $r): ?string
+    {
+        foreach ($r['links'] ?? [] as $link) {
+            if (($link['rel'] ?? '') === 'up' && preg_match('#/orders/([^/?]+)#', (string) ($link['href'] ?? ''), $m)) {
+                return $m[1];
+            }
+        }
+
+        return null;
+    }
+
     private function upId(array $r): ?string
     {
         foreach ($r['links'] ?? [] as $link) {

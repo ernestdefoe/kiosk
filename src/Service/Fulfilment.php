@@ -105,6 +105,11 @@ class Fulfilment
         if ($purchase->period_end && $periodEnd->lessThanOrEqualTo($purchase->period_end)) {
             return;
         }
+        // 🚨 An abandoned checkout (its coupon use given back) or a refund
+        // opens nothing here: a late payment goes through revive + activate.
+        if (in_array($purchase->status, [Purchase::EXPIRED, Purchase::REFUNDED], true)) {
+            return;
+        }
         // A test subscription goes on renewing at the provider after the
         // forum goes live: it doesn't keep access going.
         if ($this->wrongMode($purchase)) {
@@ -122,6 +127,33 @@ class Fulfilment
         $this->open($purchase);
 
         $this->events->dispatch(new Event\PurchaseRenewed($purchase));
+    }
+
+    /**
+     * A checkout that expired (abandoned) is paid after all: make it pending
+     * again so it opens through activate() and its checks. Its coupon use
+     * was given back, so it must be taken again; if it can't be, it isn't
+     * revived and the admin sees why in the log.
+     */
+    public function revive(Purchase $purchase): bool
+    {
+        if ($purchase->status !== Purchase::EXPIRED || $purchase->cancel_at_period_end) {
+            return false;
+        }
+        $coupon = $purchase->coupon_code ? \Ernestdefoe\Kiosk\Model\Coupon::query()->where('code', $purchase->coupon_code)->first() : null;
+        if ($purchase->coupon_code && ! $coupon?->reserve()) {
+            $this->log->error('[kiosk] '.$purchase->number.' was paid after it expired, but its coupon '.$purchase->coupon_code.' has no uses left. Grant it by hand if it should open.');
+
+            return false;
+        }
+        if (! Purchase::query()->whereKey($purchase->id)->where('status', Purchase::EXPIRED)->update(['status' => Purchase::PENDING])) {
+            \Ernestdefoe\Kiosk\Model\Coupon::release($purchase->coupon_code);
+
+            return false;
+        }
+        $purchase->refresh();
+
+        return true;
     }
 
     /**
@@ -152,9 +184,13 @@ class Fulfilment
             return;
         }
 
-        $purchase->status = $purchase->status === Purchase::PENDING ? Purchase::EXPIRED : Purchase::CANCELED;
+        $expiring = $purchase->status === Purchase::PENDING;
+        $purchase->status = $expiring ? Purchase::EXPIRED : Purchase::CANCELED;
         $purchase->cancel_at_period_end = true;
         $purchase->save();
+        if ($expiring) {
+            \Ernestdefoe\Kiosk\Model\Coupon::release($purchase->coupon_code);
+        }
 
         // Recurring access was given grace past period_end for late renewals;
         // with no renewal coming, it ends at period_end itself.

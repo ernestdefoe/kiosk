@@ -72,6 +72,15 @@ return [
                     && resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->isLocked($context->getActor(), (int) $post->discussion_id, $post->user_id ? (int) $post->user_id : null)),
         ]),
     (new Extend\ApiResource(\Flarum\Api\Resource\DiscussionResource::class))
+        ->endpoint('index', fn ($endpoint) => $endpoint->before(function (Context $context): void {
+            if (trim((string) ($context->request->getQueryParams()['filter']['q'] ?? '')) !== '') {
+                resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->searching = true;
+            }
+        })->after(function (Context $context, mixed $data) {
+            resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->searching = false;
+
+            return $data;
+        }))
         ->endpoint('index', fn ($endpoint) => $endpoint->beforeSerialization(fn (Context $context, array $results) => resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->prime($results['models'], 'id')))
         ->fields(fn () => [
             Schema\Boolean::make('kioskLocked')

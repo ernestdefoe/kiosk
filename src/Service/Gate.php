@@ -65,7 +65,15 @@ class Gate
     {
         $this->sold = null;
         $this->tagsOf = [];
+        $this->searching = false;
     }
+
+    /**
+     * 🚨 A search reads the whole first post, not its teaser: searching
+     * for a word would tell a non-buyer whether the hidden part has it. For
+     * the rest of a search request, locked first posts aren't searchable.
+     */
+    public bool $searching = false;
 
     /** Teaser tags this person hasn't bought. @return list<int> */
     public function lockedTagIds(User $actor): array
