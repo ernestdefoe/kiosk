@@ -55,4 +55,15 @@ class QueryCountTest extends KioskTestCase
         $this->assertSame($one['guest'], $this->queries(null, '/discussions', $query(20)), 'guest: queries grew with the list');
         $this->assertSame($one['member'], $this->queries(2, '/discussions', $query(20)), 'member: queries grew with the list');
     }
+
+    #[Test]
+    public function a_profile_s_posts_across_paid_discussions_cost_the_same_for_one_or_twenty(): void
+    {
+        $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+        $query = fn (int $limit) => ['filter' => ['author' => 'admin'], 'include' => 'discussion,user', 'page' => ['limit' => $limit]];
+
+        $this->seed(20);
+        $one = $this->queries(2, '/posts', $query(1));
+        $this->assertSame($one, $this->queries(2, '/posts', $query(20)), 'queries grew with the list');
+    }
 }

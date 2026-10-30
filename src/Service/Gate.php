@@ -72,6 +72,32 @@ class Gate
         return $this->bypasses($actor) ? [] : array_values(array_diff($this->sold()['discussions'], $this->access->ids($actor, 'discussion')));
     }
 
+    /**
+     * The tags of a whole page of discussions in one query, before it's
+     * serialized: every per-row check after that is free. Nothing when
+     * nothing is for sale.
+     *
+     * @param iterable<int> $discussionIds
+     */
+    public function prime(iterable $discussionIds): void
+    {
+        if (! $this->sold()['tags']) {
+            return;
+        }
+
+        $missing = array_values(array_diff(array_unique(array_map('intval', [...$discussionIds])), array_keys($this->tagsOf)));
+        if (! $missing) {
+            return;
+        }
+
+        foreach ($missing as $id) {
+            $this->tagsOf[$id] = [];
+        }
+        foreach ($this->db->table('discussion_tag')->whereIn('discussion_id', $missing)->get(['discussion_id', 'tag_id']) as $row) {
+            $this->tagsOf[(int) $row->discussion_id][] = (int) $row->tag_id;
+        }
+    }
+
     /** isLocked for a discussion model, using its tags when they're already loaded (lists). */
     public function isDiscussionLocked(User $actor, Discussion $discussion): bool
     {

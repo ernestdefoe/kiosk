@@ -64,12 +64,15 @@ return [
     (new Extend\Formatter())->render(\Ernestdefoe\Kiosk\Formatter\TeaseContent::class),
     (new Extend\Policy())->modelPolicy(\Flarum\Discussion\Discussion::class, \Ernestdefoe\Kiosk\Access\DiscussionPolicy::class),
     (new Extend\ApiResource(\Flarum\Api\Resource\PostResource::class))
+        // 🚨 A page of posts from many discussions: their tags in one query.
+        ->endpoint('index', fn ($endpoint) => $endpoint->beforeSerialization(fn (Context $context, array $results) => resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->prime(collect($results['models'])->pluck('discussion_id')->filter())))
         ->fields(fn () => [
             Schema\Boolean::make('kioskLocked')
                 ->get(fn ($post, Context $context) => (int) $post->number === 1 && $post->discussion_id
                     && resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->isLocked($context->getActor(), (int) $post->discussion_id, $post->user_id ? (int) $post->user_id : null)),
         ]),
     (new Extend\ApiResource(\Flarum\Api\Resource\DiscussionResource::class))
+        ->endpoint('index', fn ($endpoint) => $endpoint->beforeSerialization(fn (Context $context, array $results) => resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->prime(collect($results['models'])->pluck('id'))))
         ->fields(fn () => [
             Schema\Boolean::make('kioskLocked')
                 // Lists load tags already: the gate uses them, saving a lookup per row.
