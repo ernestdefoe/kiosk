@@ -1,0 +1,62 @@
+<?php
+
+namespace Ernestdefoe\Kiosk\Model;
+
+use Carbon\Carbon;
+use Flarum\Database\AbstractModel;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+/**
+ * @property int $id
+ * @property int $product_id
+ * @property int $amount_cents
+ * @property string $currency
+ * @property string $kind
+ * @property string|null $interval
+ * @property int $interval_count
+ * @property int|null $term_days
+ * @property int $trial_days
+ * @property int $position
+ * @property Carbon $created_at
+ * @property Carbon|null $archived_at
+ * @property-read Product|null $product
+ */
+class Price extends AbstractModel
+{
+    public const ONE_OFF = 'one_off';
+    public const FIXED_TERM = 'fixed_term';
+    public const RECURRING = 'recurring';
+
+    public const KINDS = [self::ONE_OFF, self::FIXED_TERM, self::RECURRING];
+    public const INTERVALS = ['day', 'week', 'month', 'year'];
+
+    protected $table = 'kiosk_prices';
+
+    protected $casts = [
+        'product_id' => 'int',
+        'amount_cents' => 'int',
+        'interval_count' => 'int',
+        'term_days' => 'int',
+        'trial_days' => 'int',
+        'position' => 'int',
+        'created_at' => 'datetime',
+        'archived_at' => 'datetime',
+    ];
+
+    /** @return BelongsTo<Product, $this> */
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function isRecurring(): bool
+    {
+        return $this->kind === self::RECURRING;
+    }
+
+    /** The terms a buyer agrees to, compared when deciding whether an edit needs a new row. */
+    public function terms(): string
+    {
+        return implode('|', [$this->amount_cents, strtoupper($this->currency), $this->kind, $this->interval, $this->interval_count, $this->term_days, $this->trial_days]);
+    }
+}

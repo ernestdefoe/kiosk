@@ -1,0 +1,103 @@
+<?php
+
+/*
+ * Kiosk — sell anything on a Flarum forum.
+ *
+ * The shape of it: the admin makes PRODUCTS, each unlocking one or more items
+ * (a group, a tag, or anything another extension registers as an unlock type)
+ * at one or more PRICES. Buying makes a PURCHASE, paying for it makes
+ * ENTITLEMENTS, and every gate asks Access whether the member holds an item
+ * right now. Providers (PayPal now) only move money and report back; the
+ * ledger here is the record.
+ */
+
+use Ernestdefoe\Kiosk\Api;
+use Ernestdefoe\Kiosk\Console\SweepCommand;
+use Ernestdefoe\Kiosk\Extend as Kiosk;
+use Ernestdefoe\Kiosk\KioskServiceProvider;
+use Ernestdefoe\Kiosk\Listener\HideSecrets;
+use Ernestdefoe\Kiosk\Notification\PurchaseBlueprint;
+use Ernestdefoe\Kiosk\Provider\PayPal;
+use Ernestdefoe\Kiosk\Service\Access;
+use Ernestdefoe\Kiosk\Unlock\GroupUnlock;
+use Ernestdefoe\Kiosk\Unlock\TagUnlock;
+use Flarum\Extend;
+use Flarum\Settings\Event\Deserializing;
+use Flarum\User\User;
+
+return [
+    (new Extend\Frontend('forum'))
+        ->js(__DIR__.'/js/dist/forum.js')
+        // The store, return and purchases pages are their own chunks.
+        ->jsDirectory(__DIR__.'/js/dist/forum')
+        ->css(__DIR__.'/less/forum.less')
+        ->route('/store', 'kiosk.store')
+        ->route('/store/purchases', 'kiosk.purchases')
+        ->route('/store/return/{number:K-[A-Za-z0-9]{10}}', 'kiosk.return'),
+
+    (new Extend\Frontend('admin'))
+        ->js(__DIR__.'/js/dist/admin.js')
+        ->jsDirectory(__DIR__.'/js/dist/admin')
+        ->css(__DIR__.'/less/admin.less'),
+
+    new Extend\Locales(__DIR__.'/locale'),
+
+    (new Extend\View())->namespace('ernestdefoe-kiosk', __DIR__.'/views'),
+
+    (new Extend\ServiceProvider())->register(KioskServiceProvider::class),
+
+    new Kiosk\UnlockType('group', GroupUnlock::class),
+    new Kiosk\Provider('paypal', PayPal::class),
+
+    (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
+        new Kiosk\UnlockType('tag', TagUnlock::class),
+    ]),
+
+    // A buyer's permissions include what they hold; a lapsed member's do not,
+    // from the second it lapses. See Access::permissionGroups.
+    (new Extend\User())->permissionGroups(fn (User $user, array $groupIds) => resolve(Access::class)->permissionGroups($user, $groupIds)),
+
+    (new Extend\Routes('api'))
+        ->get('/kiosk/store', 'kiosk.store', Api\StoreController::class)
+        ->post('/kiosk/checkout', 'kiosk.checkout', Api\CheckoutController::class)
+        ->get('/kiosk/purchases', 'kiosk.purchases.index', Api\PurchaseController::class)
+        ->get('/kiosk/purchases/{number}', 'kiosk.purchases.show', Api\PurchaseController::class)
+        ->post('/kiosk/purchases/{number}/confirm', 'kiosk.purchases.confirm', Api\PurchaseController::class)
+        ->post('/kiosk/purchases/{number}/cancel', 'kiosk.purchases.cancel', Api\PurchaseController::class)
+        ->post('/kiosk/webhooks/paypal', 'kiosk.webhooks.paypal', Api\PayPalWebhookController::class)
+        ->get('/kiosk/admin/overview', 'kiosk.admin.overview', Api\Admin\OverviewController::class)
+        ->get('/kiosk/admin/products', 'kiosk.admin.products', Api\Admin\ProductsController::class)
+        ->post('/kiosk/admin/products', 'kiosk.admin.products.create', Api\Admin\ProductsController::class)
+        ->post('/kiosk/admin/products/order', 'kiosk.admin.products.order', Api\Admin\ProductsController::class)
+        ->patch('/kiosk/admin/products/{id:[0-9]+}', 'kiosk.admin.products.update', Api\Admin\ProductsController::class)
+        ->delete('/kiosk/admin/products/{id:[0-9]+}', 'kiosk.admin.products.delete', Api\Admin\ProductsController::class)
+        ->get('/kiosk/admin/unlocks', 'kiosk.admin.unlocks', Api\Admin\UnlocksController::class)
+        ->get('/kiosk/admin/purchases', 'kiosk.admin.purchases', Api\Admin\PurchasesController::class)
+        ->post('/kiosk/admin/purchases/{id:[0-9]+}/cancel', 'kiosk.admin.purchases.cancel', Api\Admin\PurchasesController::class)
+        ->post('/kiosk/admin/purchases/{id:[0-9]+}/end', 'kiosk.admin.purchases.end', Api\Admin\PurchasesController::class)
+        ->post('/kiosk/admin/purchases/{id:[0-9]+}/refund', 'kiosk.admin.purchases.refund', Api\Admin\PurchasesController::class)
+        ->post('/kiosk/admin/grants', 'kiosk.admin.grants', Api\Admin\PurchasesController::class)
+        ->get('/kiosk/admin/webhooks', 'kiosk.admin.webhooks', Api\Admin\WebhooksController::class)
+        ->post('/kiosk/admin/webhooks/{id:[0-9]+}/replay', 'kiosk.admin.webhooks.replay', Api\Admin\WebhooksController::class)
+        ->post('/kiosk/admin/paypal', 'kiosk.admin.paypal', Api\Admin\PayPalController::class),
+
+    // PayPal cannot send a CSRF token; the signature check stands in for it.
+    (new Extend\Csrf())->exemptRoute('kiosk.webhooks.paypal'),
+
+    new Extend\ApiResource(Api\Resource\PurchaseResource::class),
+
+    (new Extend\Notification())->type(PurchaseBlueprint::class, ['alert', 'email']),
+
+    (new Extend\Event())->listen(Deserializing::class, HideSecrets::class),
+
+    (new Extend\Console())
+        ->command(SweepCommand::class)
+        ->schedule(SweepCommand::class, function (\Illuminate\Console\Scheduling\Event $event): void {
+            $event->everyTenMinutes()->withoutOverlapping();
+        }),
+
+    (new Extend\Settings())
+        ->default('ernestdefoe-kiosk.grace_days', 3)
+        ->default('ernestdefoe-kiosk.show_nav', true)
+        ->serializeToForum('kioskShowNav', 'ernestdefoe-kiosk.show_nav', 'boolval'),
+];
