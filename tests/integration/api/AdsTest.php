@@ -124,12 +124,21 @@ class AdsTest extends KioskTestCase
         $ad = $this->ad(['kind' => 'image']);
         $this->assertSame([], $this->adsFor(null), 'an image ad with no picture yet is not sent');
 
-        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAIAAAADCAYAAAC56t6BAAAAEklEQVR42mP8z8DwnwEIGGEMAEIABP+X0v0AAAAASUVORK5CYII=');
+        $draw = function (int $w, int $h, string $as): string {
+            $im = imagecreatetruecolor($w, $h);
+            ob_start();
+            $as === 'png' ? imagepng($im) : imagejpeg($im);
+
+            return (string) ob_get_clean();
+        };
+        $png = $draw(2, 3, 'png');
         $upload = fn (string $bytes, string $name) => $this->send($this->request('POST', '/api/kiosk/admin/ads/'.$ad['id'].'/image', ['authenticatedAs' => 1])
             ->withUploadedFiles(['image' => new UploadedFile((new \Laminas\Diactoros\StreamFactory())->createStream($bytes), strlen($bytes), UPLOAD_ERR_OK, $name)]));
 
         $this->assertSame(422, $upload('<svg onload="alert(1)"/>', 'x.svg')->getStatusCode());
         $this->assertSame(422, $upload('<?php echo 1;', 'x.png')->getStatusCode());
+        // A valid header with nothing decodable behind it.
+        $this->assertSame(422, $upload(substr($png, 0, 33).'<?php echo 1; ?>', 'x.png')->getStatusCode());
 
         $ok = $upload($png, 'banner.png');
         $this->assertSame(200, $ok->getStatusCode(), (string) $ok->getBody());
@@ -139,6 +148,14 @@ class AdsTest extends KioskTestCase
 
         $sent = $this->adsFor(null);
         $this->assertSame($data['imageUrl'], $sent[0]['image']);
+
+        // Big pictures are sized down, keeping their shape.
+        $data = $this->json($upload($draw(3000, 600, 'jpg'), 'big.jpg'))['data'];
+        $this->assertSame([1456, 291], [$data['imageWidth'], $data['imageHeight']]);
+        $this->assertStringEndsWith('.jpg', $data['imageUrl']);
+
+        // Switching to code drops the picture.
+        $this->assertNull($this->json($this->api('PATCH', '/kiosk/admin/ads/'.$ad['id'], 1, ['kind' => 'html', 'html' => '<b>x</b>']))['data']['imageUrl']);
 
         $this->api('DELETE', '/kiosk/admin/ads/'.$ad['id'], 1);
         $this->assertSame([], $this->adsFor(null));

@@ -469,7 +469,7 @@ ernestdefoe-kiosk:
       ad_kind: Choose a picture or code.
       ad_audience: Choose who sees the ad.
       ad_link: The link must be a web address starting with https:// or http://.
-      ad_html: Paste the ad's code (up to 20,000 characters).
+      ad_html: Paste the ad's code (up to 10,000 characters).
       ad_dates: The end date must come after the start date.
       ad_image: Upload a PNG, JPEG, GIF or WebP picture of up to 2 MB.
       unlock_type: Something in "What buying it unlocks" can't be sold on this forum.

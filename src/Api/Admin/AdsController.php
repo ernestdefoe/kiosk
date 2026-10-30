@@ -12,6 +12,7 @@ use Illuminate\Contracts\Filesystem\Factory as Filesystem;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Str;
+use Intervention\Image\ImageManager;
 use Laminas\Diactoros\Response\EmptyResponse;
 use Laminas\Diactoros\Response\JsonResponse;
 use Psr\Http\Message\ResponseInterface;
@@ -32,6 +33,9 @@ class AdsController implements RequestHandlerInterface
 
     private const MAX_BYTES = 2 * 1024 * 1024;
 
+    /** Twice a 728px banner: sharp on high-density screens, no bigger. */
+    private const MAX_SIDE = 1456;
+
     /** No SVG: it can carry script. */
     private const TYPES = ['image/png' => 'png', 'image/jpeg' => 'jpg', 'image/gif' => 'gif', 'image/webp' => 'webp'];
 
@@ -40,6 +44,7 @@ class AdsController implements RequestHandlerInterface
         private Ads $ads,
         private Filesystem $files,
         private ConnectionInterface $db,
+        private ImageManager $images,
     ) {
     }
 
@@ -118,7 +123,7 @@ class AdsController implements RequestHandlerInterface
         }
 
         $html = array_key_exists('html', $body) ? trim((string) $body['html']) : (string) $ad->html;
-        if ($kind === Ad::HTML && ($html === '' || strlen($html) > 20000)) {
+        if ($kind === Ad::HTML && ($html === '' || strlen($html) > 10000)) {
             throw $this->invalid('html', 'ad_html');
         }
 
@@ -129,6 +134,10 @@ class AdsController implements RequestHandlerInterface
         $ad->link_url = $link === '' ? null : $link;
         $ad->alt_text = array_key_exists('altText', $body) ? (mb_substr(trim((string) $body['altText']), 0, 191) ?: null) : $ad->alt_text;
         $ad->html = $kind === Ad::HTML ? $html : null;
+        if ($kind === Ad::HTML) {
+            $this->dropImage($ad);
+            $ad->image_path = $ad->image_width = $ad->image_height = null;
+        }
         $ad->is_active = array_key_exists('active', $body) ? (bool) $body['active'] : ($ad->exists ? $ad->is_active : true);
         $ad->starts_at = $this->date($body, 'startsAt', $ad->starts_at, false);
         $ad->ends_at = $this->date($body, 'endsAt', $ad->ends_at, true);
@@ -178,13 +187,22 @@ class AdsController implements RequestHandlerInterface
             throw $this->invalid('image', 'ad_image');
         }
 
+        // Re-encoded, never stored as sent: drops anything riding inside the
+        // file, and sizes it down for every visitor who will load it.
+        try {
+            $image = $this->images->read($bytes)->scaleDown(self::MAX_SIDE, self::MAX_SIDE);
+            $encoded = (string) $image->encodeByExtension($ext, quality: 85);
+        } catch (\Throwable) {
+            throw $this->invalid('image', 'ad_image');
+        }
+
         $path = 'kiosk-ads/'.Str::random(24).'.'.$ext;
-        $this->files->disk('flarum-assets')->put($path, $bytes);
+        $this->files->disk('flarum-assets')->put($path, $encoded);
 
         $this->dropImage($ad);
         $ad->image_path = $path;
-        $ad->image_width = min(65535, (int) $info[0]);
-        $ad->image_height = min(65535, (int) $info[1]);
+        $ad->image_width = $image->width();
+        $ad->image_height = $image->height();
     }
 
     private function dropImage(Ad $ad): void
