@@ -53,11 +53,39 @@ return [
     (new Extend\ServiceProvider())->register(KioskServiceProvider::class),
 
     new Kiosk\UnlockType('group', GroupUnlock::class),
+    new Kiosk\UnlockType('discussion', \Ernestdefoe\Kiosk\Unlock\DiscussionUnlock::class),
+
+    // Paid discussions (in a teaser tag, or sold one by one): replies are left
+    // out of every post query, the first post renders as a faded excerpt, and
+    // replying takes having bought it. See Service\Gate.
+    (new Extend\ModelVisibility(\Flarum\Post\Post::class))->scope(\Ernestdefoe\Kiosk\Access\ScopePostVisibility::class),
+    (new Extend\Formatter())->render(\Ernestdefoe\Kiosk\Formatter\TeaseContent::class),
+    (new Extend\Policy())->modelPolicy(\Flarum\Discussion\Discussion::class, \Ernestdefoe\Kiosk\Access\DiscussionPolicy::class),
+    (new Extend\ApiResource(\Flarum\Api\Resource\PostResource::class))
+        ->fields(fn () => [
+            Schema\Boolean::make('kioskLocked')
+                ->get(fn ($post, Context $context) => (int) $post->number === 1 && $post->discussion_id
+                    && resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->isLocked($context->getActor(), (int) $post->discussion_id, $post->user_id ? (int) $post->user_id : null)),
+        ]),
+    (new Extend\ApiResource(\Flarum\Api\Resource\DiscussionResource::class))
+        ->fields(fn () => [
+            Schema\Boolean::make('kioskLocked')
+                ->get(function ($discussion, Context $context) {
+                    $gate = resolve(\Ernestdefoe\Kiosk\Service\Gate::class);
+                    // Lists load tags already: hand them over, saving a lookup per row.
+                    if ($discussion->relationLoaded('tags')) {
+                        $gate->knowTags((int) $discussion->id, $discussion->tags->pluck('id')->map(fn ($v) => (int) $v)->all());
+                    }
+
+                    return $gate->isLocked($context->getActor(), (int) $discussion->id, $discussion->user_id ? (int) $discussion->user_id : null);
+                }),
+        ]),
     new Kiosk\Provider('paypal', PayPal::class),
     new Kiosk\Provider('stripe', Stripe::class),
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
+        (new Extend\Policy())->modelPolicy(\Flarum\Tags\Tag::class, \Ernestdefoe\Kiosk\Access\TagPolicy::class),
 
         // A shared link to a paid tag shows how to join instead of "not found".
         (new Extend\Frontend('forum'))

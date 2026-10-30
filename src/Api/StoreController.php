@@ -38,7 +38,11 @@ class StoreController implements RequestHandlerInterface
         $products = Product::query()
             ->where('is_active', true)
             ->when($type !== null,
-                fn ($query) => $query->whereIn('id', fn ($sub) => $sub->select('product_id')->from('kiosk_product_unlocks')->where('type', $type)->where('target_id', $id)),
+                fn ($query) => $query->whereIn('id', fn ($sub) => $sub->select('product_id')->from('kiosk_product_unlocks')
+                    ->where(fn ($w) => $w->where('type', $type)->where('target_id', $id))
+                    // A discussion is also opened by buying any paid tag it is in.
+                    ->when($type === 'discussion', fn ($w) => $w->orWhere(fn ($tag) => $tag->where('type', 'tag')
+                        ->whereIn('target_id', fn ($tags) => $tags->select('tag_id')->from('discussion_tag')->where('discussion_id', $id))))),
                 fn ($query) => $query->where('is_hidden', false))
             ->with(['unlocks', 'prices'])
             ->orderBy('position')

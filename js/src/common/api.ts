@@ -20,6 +20,7 @@ export interface Unlock {
   label: string | null;
   url: string | null;
   missing?: boolean;
+  teaser?: boolean | null;
 }
 
 export interface Product {

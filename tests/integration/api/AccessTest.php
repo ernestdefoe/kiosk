@@ -10,11 +10,11 @@ use PHPUnit\Framework\Attributes\Test;
 class AccessTest extends KioskTestCase
 {
     #[Test]
-    public function selling_a_tag_restricts_it_and_buyers_see_it(): void
+    public function a_hidden_paid_tag_is_restricted_and_buyers_see_it(): void
     {
         $this->assertTrue($this->seesLounge(2));
 
-        $product = $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+        $product = $this->product([['type' => 'tag', 'targetId' => self::LOUNGE, 'teaser' => false]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
         $this->assertSame('Lounge', $product['unlocks'][0]['label']);
         $this->assertTrue((bool) $this->db()->table('tags')->where('id', self::LOUNGE)->value('is_restricted'));
         $this->assertSame(1, $this->db()->table('kiosk_tag_groups')->count());
@@ -103,7 +103,7 @@ class AccessTest extends KioskTestCase
     #[Test]
     public function the_forum_lists_paid_tags_a_member_cannot_see_yet(): void
     {
-        $product = $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+        $product = $this->product([['type' => 'tag', 'targetId' => self::LOUNGE, 'teaser' => false]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
 
         $locked = fn (?int $user) => array_column($this->json($this->api('GET', '/', $user))['data']['attributes']['kioskLockedTags'] ?? [], 'slug');
         $this->assertSame(['lounge'], $locked(self::BUYER));
@@ -116,7 +116,7 @@ class AccessTest extends KioskTestCase
     #[Test]
     public function a_shared_link_to_a_paid_tag_opens_instead_of_not_found(): void
     {
-        $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+        $this->product([['type' => 'tag', 'targetId' => self::LOUNGE, 'teaser' => false]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
 
         $page = $this->send($this->request('GET', '/t/lounge', ['authenticatedAs' => self::BUYER]));
         $this->assertSame(200, $page->getStatusCode());

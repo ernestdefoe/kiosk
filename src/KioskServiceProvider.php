@@ -21,5 +21,6 @@ class KioskServiceProvider extends AbstractServiceProvider
         // One per request lifecycle: its memo is what keeps permission checks
         // to one lookup per member.
         $this->container->singleton(Access::class);
+        $this->container->singleton(Service\Gate::class);
     }
 }

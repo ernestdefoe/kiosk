@@ -296,3 +296,23 @@ span.KioskChip,
     text-decoration: underline;
   }
 }
+
+// A paid discussion's first post, seen from outside: the opening words fade
+// into the offer. The text itself is already only an excerpt (server-side).
+.KioskTeaserPost .Post-body {
+  max-height: 9em;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 40%, transparent);
+  mask-image: linear-gradient(to bottom, #000 40%, transparent);
+}
+.KioskTeaser {
+  margin-top: 10px;
+
+  .KioskLocked {
+    margin: 0;
+  }
+}
+.Badge--kioskLocked {
+  --badge-bg: var(--muted-color);
+  --badge-color: var(--body-bg);
+}

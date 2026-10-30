@@ -48,13 +48,16 @@ abstract class KioskTestCase extends TestCase
             ],
             'groups' => [['id' => self::GOLD, 'name_singular' => 'Gold', 'name_plural' => 'Gold members', 'is_hidden' => 0]],
             'group_user' => [['user_id' => self::STAFF, 'group_id' => 4]],
-            'group_permission' => [['group_id' => 4, 'permission' => 'discussion.hide']],
+            'group_permission' => [['group_id' => 4, 'permission' => 'discussion.hide'], ['group_id' => 4, 'permission' => 'kiosk.readPaid'], ['group_id' => 3, 'permission' => 'discussion.reply']],
             'tags' => [
                 ['id' => 1, 'name' => 'General', 'slug' => 'general', 'position' => 0],
                 ['id' => self::LOUNGE, 'name' => 'Lounge', 'slug' => 'lounge', 'position' => 1],
             ],
-            'discussions' => [['id' => 1, 'title' => 'Members only', 'slug' => 'members-only', 'user_id' => 1, 'created_at' => $now, 'last_posted_at' => $now, 'comment_count' => 1, 'first_post_id' => 1, 'last_post_id' => 1, 'last_post_number' => 1]],
-            'posts' => [['id' => 1, 'discussion_id' => 1, 'user_id' => 1, 'type' => 'comment', 'content' => '<t>Behind the rope</t>', 'number' => 1, 'created_at' => $now]],
+            'discussions' => [['id' => 1, 'title' => 'Members only', 'slug' => 'members-only', 'user_id' => 1, 'created_at' => $now, 'last_posted_at' => $now, 'comment_count' => 2, 'first_post_id' => 1, 'last_post_id' => 2, 'last_post_number' => 2]],
+            'posts' => [
+                ['id' => 1, 'discussion_id' => 1, 'user_id' => 1, 'type' => 'comment', 'content' => '<t>Behind the rope '.str_repeat('words ', 80).'FINALE-SECRET</t>', 'number' => 1, 'created_at' => $now],
+                ['id' => 2, 'discussion_id' => 1, 'user_id' => 1, 'type' => 'comment', 'content' => '<t>REPLY-SECRET</t>', 'number' => 2, 'created_at' => $now],
+            ],
             'discussion_tag' => [['discussion_id' => 1, 'tag_id' => self::LOUNGE]],
         ]);
 

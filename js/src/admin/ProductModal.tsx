@@ -53,6 +53,8 @@ interface UnlockRow {
   type: string;
   targetId: number;
   label: string;
+  /** Tags only: show titles to everyone (true) or hide the tag (false). */
+  teaser?: boolean;
 }
 
 export interface ProductModalAttrs extends IFormModalAttrs {
@@ -98,7 +100,9 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
     this.hidden = p?.hidden ?? false;
     this.stock = p?.stock != null ? String(p.stock) : '';
     this.buyerGroupIds = p?.buyerGroupIds ?? [];
-    this.unlocks = p ? p.unlocks.map((u) => ({ type: u.type, targetId: u.targetId, label: u.label || '#' + u.targetId })) : preset.unlocks || [];
+    this.unlocks = p
+      ? p.unlocks.map((u) => ({ type: u.type, targetId: u.targetId, label: u.label || '#' + u.targetId, teaser: u.teaser ?? undefined }))
+      : preset.unlocks || [];
     this.prices = p
       ? p.prices.map((x) => ({
           id: x.id,
@@ -193,6 +197,11 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
                     <Icon name={this.type(u.type)?.icon || 'fas fa-cube'} />
                     <span className="KioskUnlockList-type">{this.type(u.type)?.label || u.type}</span>
                     <strong>{u.label}</strong>
+                    {u.type === 'tag' ? (
+                      <Switch state={u.teaser !== false} onchange={(v: boolean) => (u.teaser = v)}>
+                        {t('admin.product.teaser')}
+                      </Switch>
+                    ) : null}
                     <Button
                       className="Button Button--icon Button--link"
                       icon="fas fa-xmark"
@@ -204,7 +213,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
               </ul>
             ) : null}
             {this.picker()}
-            {this.unlocks.some((x) => x.type === 'tag') ? <p className="KioskNote">{t('admin.product.tag_note')}</p> : null}
+            {this.unlocks.some((x) => x.type === 'tag') ? <p className="KioskNote">{t('admin.product.teaser_help')}</p> : null}
           </fieldset>
 
           <fieldset className="KioskFieldset">
@@ -347,7 +356,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
   }
 
   pick(r: { id: number; label: string }) {
-    this.unlocks.push({ type: this.pickType, targetId: r.id, label: r.label });
+    this.unlocks.push({ type: this.pickType, targetId: r.id, label: r.label, teaser: this.pickType === 'tag' ? true : undefined });
     this.query = '';
     this.close();
   }
@@ -472,7 +481,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
         hidden: this.hidden,
         stock: this.stock === '' ? null : Number(this.stock),
         buyerGroupIds: this.buyerGroupIds,
-        unlocks: this.unlocks.map((x) => ({ type: x.type, targetId: x.targetId })),
+        unlocks: this.unlocks.map((x) => ({ type: x.type, targetId: x.targetId, ...(x.type === 'tag' ? { teaser: x.teaser !== false } : {}) })),
         prices: this.prices.map((x) => ({
           id: x.id,
           kind: x.kind,

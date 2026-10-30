@@ -4,6 +4,7 @@ ernestdefoe-kiosk:
     unlock_types:
       group: Group
       tag: Tag
+      discussion: Discussion
     providers:
       paypal: PayPal
       stripe: Card (Stripe)
@@ -55,6 +56,8 @@ ernestdefoe-kiosk:
       pay_with: Pay with
       agree: "I agree to the <a>terms</a>."
       continue: Continue to {provider}
+    teaser:
+      badge: For buyers
     locked:
       title: This is for members
       title_named: "{name} is for members"
@@ -109,6 +112,8 @@ ernestdefoe-kiosk:
       provider_refused: The payment provider couldn't start the payment. The forum's admin has been told.
 
   admin:
+    permissions:
+      read_paid: Read paid content without buying
     tabs:
       overview: Overview
       products: Products
@@ -187,7 +192,8 @@ ernestdefoe-kiosk:
       unlocks_help: Pick one or more things. Buyers get all of them.
       search: "Find a {type}…"
       remove: Remove
-      tag_note: Selling a tag makes it visible only to buyers and staff. Moderators keep the permissions they had there.
+      teaser: Show titles to everyone
+      teaser_help: "With titles shown, everyone sees the tag, its discussions' titles and the opening words of each, with a Buy button; the rest, and replying, is for buyers. Switch it off to hide the tag from everyone but buyers and staff."
       prices: Prices
       add_price: Add another price
       price_note: Changing a price that people have already paid makes a new price. Existing subscribers keep paying what they signed up for.

@@ -36,6 +36,8 @@ class PaidTags
     public function all(): array
     {
         return (array) $this->cache->remember(self::KEY, 3600, fn () => $this->db->table('tags')
+            // Hidden-mode tags only: a teaser tag is visible anyway.
+            ->whereIn('id', fn ($q) => $q->select('tag_id')->from('kiosk_tag_groups')->where('teaser', false))
             ->whereIn('id', fn ($q) => $q->select('kiosk_product_unlocks.target_id')
                 ->from('kiosk_product_unlocks')
                 ->join('kiosk_products', 'kiosk_products.id', '=', 'kiosk_product_unlocks.product_id')

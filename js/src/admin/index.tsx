@@ -6,7 +6,14 @@ import SellThis from './SellThis';
 export { default as ProductModal } from './ProductModal';
 
 app.initializers.add('ernestdefoe-kiosk', () => {
-  app.registry.for('ernestdefoe-kiosk').registerPage(KioskPage);
+  app.registry
+    .for('ernestdefoe-kiosk')
+    .registerPage(KioskPage)
+    .registerPermission(
+      { icon: 'fas fa-store', label: app.translator.trans('ernestdefoe-kiosk.admin.permissions.read_paid'), permission: 'kiosk.readPaid' },
+      'moderate',
+      60
+    );
 
   // 🚨 Both editors are lazy chunks in Flarum 2: extend them by module name,
   // never by importing the class (it is undefined at boot).

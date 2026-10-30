@@ -9,6 +9,7 @@ use Ernestdefoe\Kiosk\Model\Product;
 use Ernestdefoe\Kiosk\Model\ProductUnlock;
 use Ernestdefoe\Kiosk\Model\Purchase;
 use Ernestdefoe\Kiosk\Unlock\Registry;
+use Ernestdefoe\Kiosk\Unlock\TagUnlock;
 use Flarum\Foundation\ValidationException;
 use Flarum\Locale\TranslatorInterface;
 use Illuminate\Database\ConnectionInterface;
@@ -19,6 +20,9 @@ use Illuminate\Support\Str;
 class ProductSaver
 {
     private const MAX_UNLOCKS = 25;
+
+    /** @var array<int, bool> tag id => show as a teaser, from this save */
+    private array $teasers = [];
     private const MAX_PRICES = 10;
 
     /** PayPal's longest billing cycle per interval, and a sane cap for the others. */
@@ -29,6 +33,7 @@ class ProductSaver
         private Registry $types,
         private TranslatorInterface $translator,
         private PaidTags $paidTags,
+        private Gate $gate,
     ) {
     }
 
@@ -84,13 +89,19 @@ class ProductSaver
             }
         });
 
-        // Make each item sellable (a tag becomes restricted, with its buyers'
-        // group). Outside the transaction: a type's own writes are its own.
+        // Make each item sellable (a tag gets its buyers' group, and becomes a
+        // teaser or hidden). Outside the transaction: a type's own writes are its own.
         foreach ($unlocks ?? [] as [$type, $id]) {
-            $this->types->get($type)?->prepare($id);
+            $unlock = $this->types->get($type);
+            if ($unlock instanceof TagUnlock) {
+                $unlock->setup($id, $this->teasers[$id] ?? null);
+            } else {
+                $unlock?->prepare($id);
+            }
         }
 
         $this->paidTags->forget();
+        $this->gate->forget();
 
         return $product->refresh()->load(['unlocks', 'prices']);
     }
@@ -166,6 +177,10 @@ class ProductSaver
             }
 
             $out[$type.':'.$id] = [$type, $id];
+
+            if ($type === 'tag' && Arr::has((array) $unlock, 'teaser')) {
+                $this->teasers[$id] = (bool) Arr::get((array) $unlock, 'teaser');
+            }
         }
 
         if (! $out) {

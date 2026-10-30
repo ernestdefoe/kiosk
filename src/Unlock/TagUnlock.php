@@ -29,6 +29,7 @@ class TagUnlock implements UnlockType
         private UrlGenerator $url,
         private TranslatorInterface $translator,
         private Access $access,
+        private \Ernestdefoe\Kiosk\Service\Gate $gate,
     ) {
     }
 
@@ -84,6 +85,16 @@ class TagUnlock implements UnlockType
      */
     public function prepare(int $targetId): void
     {
+        $this->setup($targetId, null);
+    }
+
+    /**
+     * Make the tag sellable, as a teaser (titles visible, text locked) or
+     * hidden (restricted, shown only as a locked tile). Null keeps the tag's
+     * current mode, or teaser for a tag that is new to Kiosk.
+     */
+    public function setup(int $targetId, ?bool $teaser): void
+    {
         /** @var Tag|null $tag */
         $tag = Tag::query()->find($targetId);
 
@@ -91,8 +102,10 @@ class TagUnlock implements UnlockType
             return;
         }
 
-        $this->db->transaction(function () use ($tag) {
-            $groupId = $this->db->table('kiosk_tag_groups')->where('tag_id', $tag->id)->value('group_id');
+        $this->db->transaction(function () use ($tag, $teaser) {
+            $row = $this->db->table('kiosk_tag_groups')->where('tag_id', $tag->id)->first();
+            $groupId = $row?->group_id;
+            $teaser ??= $row ? (bool) $row->teaser : true;
 
             if (! $groupId || ! Group::query()->whereKey($groupId)->exists()) {
                 $group = new Group();
@@ -102,17 +115,29 @@ class TagUnlock implements UnlockType
                 $group->is_hidden = true;
                 $group->save();
                 $groupId = $group->id;
-
-                $this->db->table('kiosk_tag_groups')->updateOrInsert(['tag_id' => $tag->id], ['group_id' => $groupId]);
             }
 
             $rows = [];
+            $restrictedByKiosk = $row ? (bool) $row->restricted_by_kiosk : false;
 
-            if (! $tag->is_restricted) {
+            if (! $teaser && ! $tag->is_restricted) {
+                // Hidden: restrict it, keeping staff in.
                 $rows = $this->staffRows($tag);
                 $tag->is_restricted = true;
                 $tag->save();
+                $restrictedByKiosk = true;
+            } elseif ($teaser && $tag->is_restricted && $restrictedByKiosk) {
+                // Back to a teaser: undo only a restriction Kiosk added.
+                $tag->is_restricted = false;
+                $tag->save();
+                $restrictedByKiosk = false;
             }
+
+            $this->db->table('kiosk_tag_groups')->updateOrInsert(['tag_id' => $tag->id], [
+                'group_id' => $groupId,
+                'teaser' => $teaser,
+                'restricted_by_kiosk' => $restrictedByKiosk,
+            ]);
 
             $perms = array_map(fn ($p) => "tag{$tag->id}.$p", self::BUYER);
 
@@ -129,6 +154,7 @@ class TagUnlock implements UnlockType
             $this->db->table('group_permission')->insertOrIgnore(array_values($rows));
         });
 
+        $this->gate->forget();
         $this->access->forgetTagGroups();
     }
 

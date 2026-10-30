@@ -32,6 +32,8 @@ class Presenter
     {
         $products = Collection::make($products);
         $names = $this->names($products->flatMap(fn (Product $p) => $p->unlocks->map(fn ($u) => [$u->type, $u->target_id])));
+        $tagIds = $products->flatMap(fn (Product $p) => $p->unlocks->where('type', 'tag')->pluck('target_id'))->unique()->values()->all();
+        $teasers = $tagIds ? resolve(\Illuminate\Database\ConnectionInterface::class)->table('kiosk_tag_groups')->whereIn('tag_id', $tagIds)->pluck('teaser', 'tag_id')->all() : [];
 
         return $products->map(fn (Product $p) => [
             'id' => $p->id,
@@ -48,6 +50,7 @@ class Presenter
                 'label' => $names[$u->type][$u->target_id]['label'] ?? null,
                 'url' => $names[$u->type][$u->target_id]['url'] ?? null,
                 'missing' => ! isset($names[$u->type][$u->target_id]),
+                'teaser' => $u->type === 'tag' ? (bool) ($teasers[$u->target_id] ?? true) : null,
             ])->values()->all(),
             'prices' => $p->prices->map(fn (Price $price) => $this->price($price))->values()->all(),
             'refusal' => $p->refusal($actor),
