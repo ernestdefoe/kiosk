@@ -37,7 +37,8 @@ return [
         // foreign key and can't be dropped until another index covers it.
         if (! $schema->hasIndex('kiosk_entitlements', ['purchase_id', 'user_id', 'type', 'target_id'], 'unique')) {
             $schema->table('kiosk_entitlements', function ($table) {
-                $table->unique(['purchase_id', 'user_id', 'type', 'target_id']);
+                // 🚨 Named: the generated name plus a table prefix passes MySQL's 64 characters.
+                $table->unique(['purchase_id', 'user_id', 'type', 'target_id'], 'kiosk_entitlements_holder_unique');
             });
         }
         if ($schema->hasIndex('kiosk_entitlements', ['purchase_id', 'type', 'target_id'], 'unique')) {
@@ -51,7 +52,7 @@ return [
             $table->unique(['purchase_id', 'type', 'target_id']);
         });
         $schema->table('kiosk_entitlements', function ($table) {
-            $table->dropUnique(['purchase_id', 'user_id', 'type', 'target_id']);
+            $table->dropUnique('kiosk_entitlements_holder_unique');
         });
         $schema->dropIfExists('kiosk_seats');
         $schema->table('kiosk_purchases', function ($table) {
