@@ -41,9 +41,11 @@ return [
         ->route('/store/purchases', 'kiosk.purchases')
         ->route('/store/return/{number:K-[A-Za-z0-9]{10}}', 'kiosk.return'),
 
+    // 🚨 No jsDirectory for the admin: it has no lazy chunks, and Flarum creates
+    // a missing chunk folder inside vendor, which fails where vendor isn't
+    // writable (as it shouldn't be). ShippedAssetsTest guards this.
     (new Extend\Frontend('admin'))
         ->js(__DIR__.'/js/dist/admin.js')
-        ->jsDirectory(__DIR__.'/js/dist/admin')
         ->css(__DIR__.'/less/admin.less'),
 
     new Extend\Locales(__DIR__.'/locale'),
