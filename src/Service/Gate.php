@@ -76,7 +76,7 @@ class Gate
     public function isDiscussionLocked(User $actor, Discussion $discussion): bool
     {
         if ($discussion->relationLoaded('tags')) {
-            $this->tagsOf[(int) $discussion->id] ??= $discussion->tags->pluck('id')->map(fn ($v) => (int) $v)->all();
+            $this->tagsOf[(int) $discussion->id] ??= $discussion->getRelation('tags')->pluck('id')->map(fn ($v) => (int) $v)->all();
         }
 
         return $this->isLocked($actor, (int) $discussion->id, $discussion->user_id ? (int) $discussion->user_id : null);
