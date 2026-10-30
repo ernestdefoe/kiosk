@@ -222,6 +222,7 @@ ernestdefoe-kiosk:
       detected_live: Live key. Real payments.
       ok: Connected. Kiosk set up Stripe's notifications for you.
       webhook_help: Kiosk registers this with Stripe for you. There's nothing to copy.
+      last_webhook: Last notice from Stripe
       failed:
         credentials: Stripe didn't accept this key. Copy the Secret key (not the Publishable key) from Stripe's API keys page.
         unreachable: Kiosk couldn't reach Stripe. Try again in a moment.

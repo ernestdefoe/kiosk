@@ -13,6 +13,7 @@
 
 use Ernestdefoe\Kiosk\Api;
 use Ernestdefoe\Kiosk\Console\SweepCommand;
+use Ernestdefoe\Kiosk\Content;
 use Ernestdefoe\Kiosk\Extend as Kiosk;
 use Ernestdefoe\Kiosk\KioskServiceProvider;
 use Ernestdefoe\Kiosk\Listener\HideSecrets;
@@ -57,6 +58,11 @@ return [
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
+
+        // A shared link to a paid tag shows how to join instead of "not found".
+        (new Extend\Frontend('forum'))
+            ->removeRoute('tag')
+            ->route('/t/{slug}', 'tag', Content\LockedTag::class),
 
         // Paid tags this visitor can't see, shown locked with a Buy button.
         (new Extend\ApiResource(ForumResource::class))

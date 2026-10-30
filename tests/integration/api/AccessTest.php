@@ -112,4 +112,20 @@ class AccessTest extends KioskTestCase
         $this->api('POST', '/kiosk/admin/grants', 1, ['user' => 'buyer', 'productId' => $product['id'], 'days' => 0]);
         $this->assertSame([], $locked(self::BUYER));
     }
+
+    #[Test]
+    public function a_shared_link_to_a_paid_tag_opens_instead_of_not_found(): void
+    {
+        $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+
+        $page = $this->send($this->request('GET', '/t/lounge', ['authenticatedAs' => self::BUYER]));
+        $this->assertSame(200, $page->getStatusCode());
+        $this->assertStringContainsString('<title>Lounge', (string) $page->getBody());
+        // Its discussions are never sent to someone without access.
+        $this->assertStringNotContainsString('Members only', (string) $page->getBody());
+
+        // A tag that is not for sale still answers "not found".
+        $this->db()->table('tags')->insert(['id' => 3, 'name' => 'Secret', 'slug' => 'secret', 'is_restricted' => true]);
+        $this->assertSame(404, $this->send($this->request('GET', '/t/secret', ['authenticatedAs' => self::BUYER]))->getStatusCode());
+    }
 }

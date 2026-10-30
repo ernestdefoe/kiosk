@@ -566,7 +566,7 @@ export default class KioskPage extends ExtensionPage {
             <code>{this.overview!.stripeWebhookUrl}</code>
             <small>{t('admin.stripe.webhook_help')}</small>
           </dd>
-          <dt>{t('admin.payments.last_webhook')}</dt>
+          <dt>{t('admin.stripe.last_webhook')}</dt>
           <dd>{s.lastWebhookAt ? new Date(s.lastWebhookAt).toLocaleString() : t('admin.payments.never')}</dd>
         </dl>
       </section>
