@@ -79,7 +79,7 @@ export default class ProductCard extends Component<ProductCardAttrs> {
         ) : null}
 
         <div className="KioskCard-foot">
-          {product.prices.length > 1 ? (
+          {owned ? null : product.prices.length > 1 ? (
             <div className="KioskCard-prices" role="radiogroup" aria-label={String(t('forum.card.choose_price'))}>
               {product.prices.map((price) => (
                 <button

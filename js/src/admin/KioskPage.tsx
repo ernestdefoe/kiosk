@@ -362,7 +362,9 @@ export default class KioskPage extends ExtensionPage {
             placeholder={extractText(t('admin.purchases.search'))}
             value={this.filter.q}
             oninput={(e: InputEvent) => (this.filter.q = (e.target as HTMLInputElement).value)}
-            onkeydown={(e: KeyboardEvent) => e.key === 'Enter' && this.loadPurchases()}
+            onkeydown={(e: KeyboardEvent) => {
+              if (e.key === 'Enter') this.loadPurchases();
+            }}
           />
           <Select
             options={statuses}

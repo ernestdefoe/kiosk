@@ -26,7 +26,9 @@ app.initializers.add('ernestdefoe-kiosk', () => {
 
     items.add(
       'kiosk-store',
-      <LinkButton href={app.route('kiosk.store')} icon="fas fa-store">
+      // Active on My purchases and the return page too, so the phone header
+      // (which titles the page from the active nav item) says Store, not All Discussions.
+      <LinkButton href={app.route('kiosk.store')} icon="fas fa-store" active={/^\/store(\/|$|\?)/.test(m.route.get() || '')}>
         {t('forum.nav')}
       </LinkButton>,
       5

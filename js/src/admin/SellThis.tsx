@@ -61,7 +61,7 @@ export default class SellThis extends Component<Attrs> {
               <p className="helpText">{t('admin.sell_this.help_' + this.attrs.type)}</p>
             )}
             <Button className="Button" icon="fas fa-store" onclick={() => this.open()}>
-              {t('admin.sell_this.button')}
+              {this.products.length ? t('admin.sell_this.another') : t('admin.sell_this.button')}
             </Button>
           </div>
         )}

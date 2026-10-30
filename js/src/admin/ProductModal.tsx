@@ -310,6 +310,18 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
             value={this.query}
             placeholder={extractText(t('admin.product.search', { type: this.type(this.pickType)?.label || '' }))}
             onfocus={() => this.search()}
+            onblur={() => {
+              // Late enough for a click on a result to land first.
+              window.setTimeout(() => this.close(), 200);
+            }}
+            onkeydown={(e: KeyboardEvent) => {
+              // 🚨 A block, not `e.key === 'Escape' && …`: Mithril treats a
+              // handler returning false as preventDefault, which ate every keystroke.
+              if (e.key === 'Escape') {
+                e.preventDefault();
+                this.close();
+              }
+            }}
             oninput={(e: InputEvent) => {
               this.query = (e.target as HTMLInputElement).value;
               clearTimeout(this.timer);
@@ -322,14 +334,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
                 .filter((r) => !this.unlocks.some((x) => x.type === this.pickType && x.targetId === r.id))
                 .map((r) => (
                   <li>
-                    <button
-                      type="button"
-                      onclick={() => {
-                        this.unlocks.push({ type: this.pickType, targetId: r.id, label: r.label });
-                        this.results = [];
-                        this.query = '';
-                      }}
-                    >
+                    <button type="button" onclick={() => this.pick(r)}>
                       {r.label}
                     </button>
                   </li>
@@ -339,6 +344,20 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
         </div>
       </div>
     );
+  }
+
+  pick(r: { id: number; label: string }) {
+    this.unlocks.push({ type: this.pickType, targetId: r.id, label: r.label });
+    this.query = '';
+    this.close();
+  }
+
+  /** Close the results, and make any search still on its way land nowhere. */
+  close() {
+    clearTimeout(this.timer);
+    this.searching++;
+    this.results = [];
+    m.redraw();
   }
 
   search() {
@@ -362,72 +381,77 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
 
     return (
       <div className="KioskPriceRow">
-        <Select options={kinds} value={p.kind} onchange={(v: Kind) => (p.kind = v)} />
-        <input
-          className="FormControl KioskNarrow"
-          type="number"
-          min="0"
-          step="0.01"
-          value={p.amount}
-          aria-label={extractText(t('admin.product.amount'))}
-          oninput={(e: InputEvent) => (p.amount = (e.target as HTMLInputElement).value)}
-        />
-        <Select options={currencies} value={p.currency} onchange={(v: string) => (p.currency = v)} />
+        <div className="KioskPriceRow-main">
+          <Select options={kinds} value={p.kind} onchange={(v: Kind) => (p.kind = v)} />
+          <input
+            className="FormControl KioskNarrow"
+            type="number"
+            min="0"
+            step="0.01"
+            value={p.amount}
+            aria-label={extractText(t('admin.product.amount'))}
+            oninput={(e: InputEvent) => (p.amount = (e.target as HTMLInputElement).value)}
+          />
+          <Select options={currencies} value={p.currency} onchange={(v: string) => (p.currency = v)} />
+          <span className="KioskPriceRow-preview">
+            {cents > 0
+              ? priceLabel({
+                  amountCents: cents,
+                  currency: p.currency,
+                  kind: p.kind,
+                  interval: p.interval,
+                  intervalCount: p.intervalCount,
+                  termDays: p.termDays,
+                })
+              : ''}
+          </span>
+          {this.prices.length > 1 ? (
+            <Button
+              className="Button Button--icon Button--link"
+              icon="fas fa-xmark"
+              aria-label={extractText(t('admin.product.remove'))}
+              onclick={() => this.prices.splice(i, 1)}
+            />
+          ) : null}
+        </div>
         {p.kind === 'recurring' ? (
-          <>
-            <span className="KioskPriceRow-word">{t('admin.product.every')}</span>
+          <div className="KioskPriceRow-terms">
+            <span>{t('admin.product.every')}</span>
             <input
               className="FormControl KioskTiny"
               type="number"
               min={1}
               value={p.intervalCount}
+              aria-label={extractText(t('admin.product.every'))}
               oninput={(e: InputEvent) => (p.intervalCount = Math.max(1, parseInt((e.target as HTMLInputElement).value) || 1))}
             />
             <Select options={intervals} value={p.interval} onchange={(v: Interval) => (p.interval = v)} />
-            <span className="KioskPriceRow-word">{t('admin.product.trial')}</span>
+            <span className="KioskPriceRow-gap">{t('admin.product.trial')}</span>
             <input
               className="FormControl KioskTiny"
               type="number"
               min={0}
               max={365}
               value={p.trialDays}
+              aria-label={extractText(t('admin.product.trial'))}
               oninput={(e: InputEvent) => (p.trialDays = Math.max(0, parseInt((e.target as HTMLInputElement).value) || 0))}
             />
-            <span className="KioskPriceRow-word">{t('admin.product.days')}</span>
-          </>
+            <span>{t('admin.product.days')}</span>
+          </div>
         ) : p.kind === 'fixed_term' ? (
-          <>
-            <span className="KioskPriceRow-word">{t('admin.product.for')}</span>
+          <div className="KioskPriceRow-terms">
+            <span>{t('admin.product.for')}</span>
             <input
               className="FormControl KioskTiny"
               type="number"
               min={1}
               max={3650}
               value={p.termDays}
+              aria-label={extractText(t('admin.product.for'))}
               oninput={(e: InputEvent) => (p.termDays = Math.max(1, parseInt((e.target as HTMLInputElement).value) || 1))}
             />
-            <span className="KioskPriceRow-word">{t('admin.product.days')}</span>
-          </>
-        ) : null}
-        <span className="KioskPriceRow-preview">
-          {cents > 0
-            ? priceLabel({
-                amountCents: cents,
-                currency: p.currency,
-                kind: p.kind,
-                interval: p.interval,
-                intervalCount: p.intervalCount,
-                termDays: p.termDays,
-              })
-            : ''}
-        </span>
-        {this.prices.length > 1 ? (
-          <Button
-            className="Button Button--icon Button--link"
-            icon="fas fa-xmark"
-            aria-label={extractText(t('admin.product.remove'))}
-            onclick={() => this.prices.splice(i, 1)}
-          />
+            <span>{t('admin.product.days')}</span>
+          </div>
         ) : null}
       </div>
     );

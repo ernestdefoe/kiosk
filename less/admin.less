@@ -1,3 +1,5 @@
+@import 'common.less';
+
 // Kiosk's admin — Flarum 2 CSS properties only, so it follows the admin theme.
 
 .KioskAdmin {
@@ -128,7 +130,7 @@ button.KioskTemplate {
 .KioskStats {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(auto-fill, minmax(~"min(200px, 100%)", 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(~"min(150px, 100%)", 1fr));
   margin-bottom: 20px;
 }
 
@@ -333,7 +335,11 @@ button.KioskTemplate {
   .KioskModeSwitch {
     display: flex;
     gap: 6px;
+    max-width: 360px;
     margin-bottom: 12px;
+  }
+  .helpText {
+    margin-bottom: 16px;
   }
 }
 
@@ -381,6 +387,13 @@ button.KioskTemplate {
   margin: 20px 0;
   padding: 0;
   border: 0;
+
+  .Form-group {
+    margin-top: 14px;
+  }
+  .Checkbox--switch {
+    margin-bottom: 6px;
+  }
 
   legend {
     font-weight: bold;
@@ -459,18 +472,25 @@ button.KioskTemplate {
 }
 
 .KioskPriceRow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 8px 0;
+  padding: 10px 0;
   border-bottom: 1px solid var(--control-bg);
 
+  .KioskPriceRow-main,
+  .KioskPriceRow-terms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  .KioskPriceRow-terms {
+    margin-top: 6px;
+    color: var(--muted-color);
+  }
+  .KioskPriceRow-gap {
+    margin-left: 12px;
+  }
   .Select {
     width: auto;
-  }
-  .KioskPriceRow-word {
-    color: var(--muted-color);
   }
   .KioskPriceRow-preview {
     flex: 1 1 140px;

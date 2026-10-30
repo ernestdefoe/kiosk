@@ -214,6 +214,7 @@ ernestdefoe-kiosk:
     sell_this:
       legend: Sell this
       button: Sell this
+      another: Sell it another way
       help_tag: Charge for access to this tag. Only buyers and staff will see it.
       help_group: Charge for membership of this group. Buyers get its permissions and badge.
     purchases:
