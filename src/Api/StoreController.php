@@ -2,7 +2,9 @@
 
 namespace Ernestdefoe\Kiosk\Api;
 
+use Carbon\Carbon;
 use Ernestdefoe\Kiosk\Model\Product;
+use Ernestdefoe\Kiosk\Model\Purchase;
 use Ernestdefoe\Kiosk\Provider\Providers;
 use Ernestdefoe\Kiosk\Service\Presenter;
 use Flarum\Settings\SettingsRepositoryInterface;
@@ -48,6 +50,18 @@ class StoreController implements RequestHandlerInterface
         return new JsonResponse([
             'data' => $this->presenter->products($products, $actor),
             'meta' => [
+                // Products the viewer holds right now, so a card says "You have
+                // this" instead of selling it to them again. One query.
+                'owned' => $actor->isGuest() ? [] : Purchase::query()
+                    ->where('user_id', $actor->id)
+                    ->whereIn('status', [Purchase::ACTIVE, Purchase::CANCELED])
+                    ->where(fn ($q) => $q->whereNull('period_end')->orWhere('period_end', '>', Carbon::now()))
+                    ->whereNotNull('product_id')
+                    ->distinct()
+                    ->pluck('product_id')
+                    ->map(fn ($id) => (int) $id)
+                    ->values()
+                    ->all(),
                 'providers' => array_map(fn ($p) => ['key' => $p->key(), 'mode' => $p->mode()], $this->providers->ready()),
                 'termsUrl' => $this->settings->get('ernestdefoe-kiosk.terms_url') ?: null,
             ],
