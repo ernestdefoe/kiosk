@@ -7,15 +7,22 @@ use Flarum\Tags\Tag;
 use Flarum\User\Access\AbstractPolicy;
 use Flarum\User\User;
 
-/** Starting a discussion in a paid teaser tag takes having bought the tag. */
+/**
+ * Starting a discussion in a paid teaser tag takes having bought the tag; in
+ * a tag where posting is paid, a listing credit or a posting pass.
+ */
 class TagPolicy extends AbstractPolicy
 {
-    public function __construct(private Gate $gate)
+    public function __construct(private Gate $gate, private \Ernestdefoe\Kiosk\Service\Credits $credits)
     {
     }
 
     public function startDiscussion(User $actor, Tag $tag): ?string
     {
-        return in_array((int) $tag->id, $this->gate->lockedTagIds($actor), true) ? $this->deny() : null;
+        $id = (int) $tag->id;
+
+        return in_array($id, $this->gate->lockedTagIds($actor), true) || in_array($id, $this->credits->postLockedTags($actor), true)
+            ? $this->deny()
+            : null;
     }
 }

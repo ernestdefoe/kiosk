@@ -5,6 +5,9 @@ ernestdefoe-kiosk:
       group: Group
       tag: Tag
       discussion: Discussion
+      post: Posting in a tag
+      bump: Bumps in a tag
+      tip: Tips in a tag
     providers:
       paypal: PayPal
       stripe: Card (Stripe)
@@ -25,6 +28,7 @@ ernestdefoe-kiosk:
       reversed: Charged back
     price:
       once: "{amount} once"
+      custom: "Pay what you want (at least {amount})"
       for_days: "{amount} for {count, plural, one {# day} other {# days}}"
       per_day: "{amount} a day"
       per_week: "{amount} a week"
@@ -47,6 +51,7 @@ ernestdefoe-kiosk:
       buy: Buy
       login_to_buy: Log in to buy
       owned: You have this
+      your_amount: "Your amount"
       refusal:
         unavailable: Not on sale right now.
         sold_out: Sold out.
@@ -58,6 +63,14 @@ ernestdefoe-kiosk:
       continue: Continue to {provider}
     teaser:
       badge: For buyers
+    post_offer:
+      title: "Posting in {tag}"
+    bump:
+      button: "Bump to top ({count} left)"
+      done: Bumped to the top.
+    tips:
+      title: Back this
+      raised: "{amount} raised by {count, plural, one {# backer} other {# backers}}"
     locked:
       title: This is for members
       title_named: "{name} is for members"
@@ -108,6 +121,9 @@ ernestdefoe-kiosk:
       already_subscribed: You already subscribe to this. Manage it from My purchases.
       too_many: Too many checkouts at once. Wait a few minutes and try again.
       cannot_cancel: This purchase can't be canceled.
+      amount: Enter an amount at or above the minimum.
+      tip_target: A tip backs a discussion in its tag.
+      no_bumps: You have no bumps left for this discussion.
       provider_unreachable: We couldn't reach the payment provider. Try again in a moment.
       provider_refused: The payment provider couldn't start the payment. The forum's admin has been told.
 
@@ -206,6 +222,7 @@ ernestdefoe-kiosk:
         recurring: Renews
         one_off: One-time, forever
         fixed_term: One-time, for a set time
+        custom: "Pay what you want (this is the minimum)"
       interval:
         day: day(s)
         week: week(s)

@@ -55,6 +55,8 @@ return [
     new Kiosk\UnlockType('group', GroupUnlock::class),
     new Kiosk\UnlockType('discussion', \Ernestdefoe\Kiosk\Unlock\DiscussionUnlock::class),
 
+    (new Extend\Event())->listen(\Flarum\Discussion\Event\Started::class, \Ernestdefoe\Kiosk\Listener\SpendPostingCredit::class),
+
     // Paid discussions (in a teaser tag, or sold one by one): replies are left
     // out of every post query, the first post renders as a faded excerpt, and
     // replying takes having bought it. See Service\Gate.
@@ -79,12 +81,31 @@ return [
 
                     return $gate->isLocked($context->getActor(), (int) $discussion->id, $discussion->user_id ? (int) $discussion->user_id : null);
                 }),
+            // The author's bump credits for it. Only asked of the author's own
+            // discussions, from what they hold (no query).
+            Schema\Integer::make('kioskBumps')
+                ->visible(fn ($discussion, Context $context) => ! $context->getActor()->isGuest() && (int) $discussion->user_id === (int) $context->getActor()->id)
+                ->get(function ($discussion, Context $context) {
+                    $credits = resolve(\Ernestdefoe\Kiosk\Service\Credits::class);
+                    if (! $credits->tags()['bump']) {
+                        return 0;
+                    }
+                    $tags = $discussion->relationLoaded('tags')
+                        ? $discussion->tags->pluck('id')->map(fn ($v) => (int) $v)->all()
+                        : resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->tagsOf((int) $discussion->id);
+
+                    return $credits->bumpsFor($context->getActor(), $tags);
+                }),
         ]),
     new Kiosk\Provider('paypal', PayPal::class),
     new Kiosk\Provider('stripe', Stripe::class),
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
+        // Paid actions in a tag: posting (credits or a pass), bumping, tipping.
+        new Kiosk\UnlockType('post', \Ernestdefoe\Kiosk\Unlock\PostInTagUnlock::class),
+        new Kiosk\UnlockType('bump', \Ernestdefoe\Kiosk\Unlock\BumpUnlock::class),
+        new Kiosk\UnlockType('tip', \Ernestdefoe\Kiosk\Unlock\TipUnlock::class),
         (new Extend\Policy())->modelPolicy(\Flarum\Tags\Tag::class, \Ernestdefoe\Kiosk\Access\TagPolicy::class),
 
         // A shared link to a paid tag shows how to join instead of "not found".
@@ -97,6 +118,12 @@ return [
             ->fields(fn () => [
                 Schema\Arr::make('kioskLockedTags')
                     ->get(fn ($forum, Context $context) => resolve(PaidTags::class)->lockedFor($context->getActor())),
+                // Tags where posting is paid and this visitor can't post yet; and where
+                // bumps and tips are sold. Cached lists and Access: no query.
+                Schema\Arr::make('kioskPostTags')
+                    ->get(fn ($forum, Context $context) => resolve(\Ernestdefoe\Kiosk\Service\Credits::class)->postLockedTags($context->getActor())),
+                Schema\Arr::make('kioskTipTags')
+                    ->get(fn () => resolve(\Ernestdefoe\Kiosk\Service\Credits::class)->tags()['tip']),
             ]),
     ]),
 
@@ -112,6 +139,8 @@ return [
         ->post('/kiosk/purchases/{number}/confirm', 'kiosk.purchases.confirm', Api\PurchaseController::class)
         ->post('/kiosk/purchases/{number}/cancel', 'kiosk.purchases.cancel', Api\PurchaseController::class)
         ->post('/kiosk/webhooks/{provider:[a-z]+}', 'kiosk.webhooks', Api\WebhookController::class)
+        ->post('/kiosk/discussions/{id:[0-9]+}/bump', 'kiosk.discussions.bump', Api\ActionsController::class)
+        ->get('/kiosk/discussions/{id:[0-9]+}/tips', 'kiosk.discussions.tips', Api\ActionsController::class)
         ->get('/kiosk/admin/overview', 'kiosk.admin.overview', Api\Admin\OverviewController::class)
         ->get('/kiosk/admin/products', 'kiosk.admin.products', Api\Admin\ProductsController::class)
         ->post('/kiosk/admin/products', 'kiosk.admin.products.create', Api\Admin\ProductsController::class)

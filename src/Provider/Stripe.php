@@ -71,7 +71,7 @@ class Stripe implements Provider, WebhookProvider
 
         $params = [
             'mode' => $recurring ? 'subscription' : 'payment',
-            'line_items' => [['price' => $this->price($price, $product), 'quantity' => 1]],
+            'line_items' => [$this->lineItem($purchase, $price, $product)],
             // Stripe swaps in the session id, which the return page hands back.
             'success_url' => $returnUrl.'?session_id={CHECKOUT_SESSION_ID}',
             'cancel_url' => $cancelUrl,
@@ -99,6 +99,26 @@ class Stripe implements Provider, WebhookProvider
         $purchase->save();
 
         return (string) $session['url'];
+    }
+
+    /**
+     * The checkout's line: the stored Stripe price, or — when this purchase
+     * costs something else (pay what you want, a coupon) — the amount inline.
+     *
+     * @return array<string, mixed>
+     */
+    private function lineItem(Purchase $purchase, Price $price, Product $product): array
+    {
+        if ($purchase->amount_cents === $price->amount_cents && $price->kind !== Price::CUSTOM) {
+            return ['price' => $this->price($price, $product), 'quantity' => 1];
+        }
+
+        return ['quantity' => 1, 'price_data' => array_filter([
+            'currency' => strtolower($purchase->currency),
+            'unit_amount' => $purchase->amount_cents,
+            'product_data' => ['name' => mb_substr($purchase->product_name, 0, 250)],
+            'recurring' => $price->isRecurring() ? ['interval' => $price->interval, 'interval_count' => $price->interval_count] : null,
+        ])];
     }
 
     /**

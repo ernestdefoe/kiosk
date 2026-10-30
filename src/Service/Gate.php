@@ -95,7 +95,7 @@ class Gate
     }
 
     /** @return list<int> */
-    private function tagsOf(int $discussionId): array
+    public function tagsOf(int $discussionId): array
     {
         return $this->tagsOf[$discussionId] ??= $this->db->table('discussion_tag')->where('discussion_id', $discussionId)
             ->pluck('tag_id')->map(fn ($v) => (int) $v)->all();

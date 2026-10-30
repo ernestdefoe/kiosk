@@ -102,6 +102,7 @@ class ProductSaver
 
         $this->paidTags->forget();
         $this->gate->forget();
+        resolve(Credits::class)->forget();
 
         return $product->refresh()->load(['unlocks', 'prices']);
     }

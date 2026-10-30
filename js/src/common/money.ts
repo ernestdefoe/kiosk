@@ -36,6 +36,7 @@ export function priceLabel(p: {
     );
   }
   if (p.kind === 'fixed_term') return extractText(t('lib.price.for_days', { amount, count: p.termDays || 0 }));
+  if (p.kind === 'custom') return extractText(t('lib.price.custom', { amount }));
 
   return extractText(t('lib.price.once', { amount }));
 }

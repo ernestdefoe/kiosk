@@ -22,5 +22,6 @@ class KioskServiceProvider extends AbstractServiceProvider
         // to one lookup per member.
         $this->container->singleton(Access::class);
         $this->container->singleton(Service\Gate::class);
+        $this->container->singleton(Service\Credits::class);
     }
 }

@@ -27,8 +27,13 @@ class Checkout
     ) {
     }
 
-    /** @return array{url: string, number: string} */
-    public function start(User $actor, int $priceId, string $providerKey): array
+    /**
+     * @param array{amount?: mixed, context?: array{type?: string, id?: int}} $options
+     *   amount: what the buyer chose, for a pay-what-you-want price;
+     *   context: what a tip backs ({type: discussion, id}).
+     * @return array{url: string, number: string}
+     */
+    public function start(User $actor, int $priceId, string $providerKey, array $options = []): array
     {
         $actor->assertRegistered();
 
@@ -73,6 +78,16 @@ class Checkout
         }
 
         $purchase = Purchase::start($actor, $price, $product, $provider->key(), $provider->mode());
+
+        if ($price->kind === Price::CUSTOM) {
+            $chosen = \Ernestdefoe\Kiosk\Model\Money::toMinor($options['amount'] ?? null, $price->currency);
+            if ($chosen === null || $chosen < $price->amount_cents || $chosen > 100_000_000) {
+                throw $this->error('amount');
+            }
+            $purchase->amount_cents = $chosen;
+        }
+
+        $this->applyContext($purchase, $product, $options['context'] ?? null);
         $purchase->save();
 
         $return = $this->url->to('forum')->route('kiosk.return', ['number' => $purchase->number]);
@@ -88,6 +103,31 @@ class Checkout
         }
 
         return ['url' => $link, 'number' => $purchase->number];
+    }
+
+    /**
+     * A tip backs one discussion, which must be in a tag the product tips in
+     * and visible to the buyer. Anything else carries no context.
+     *
+     * @param mixed $context
+     */
+    private function applyContext(Purchase $purchase, \Ernestdefoe\Kiosk\Model\Product $product, mixed $context): void
+    {
+        $tipTags = $product->unlocks()->where('type', 'tip')->pluck('target_id')->map(fn ($v) => (int) $v)->all();
+
+        if (! $tipTags) {
+            return;
+        }
+
+        $id = (int) (is_array($context) ? ($context['id'] ?? 0) : 0);
+        $discussion = $id ? \Flarum\Discussion\Discussion::query()->whereVisibleTo(User::query()->findOrFail($purchase->user_id))->find($id) : null;
+
+        if (! $discussion || ! array_intersect($tipTags, $discussion->tags()->pluck('tags.id')->map(fn ($v) => (int) $v)->all())) {
+            throw $this->error('tip_target');
+        }
+
+        $purchase->context_type = 'discussion';
+        $purchase->context_id = $discussion->id;
     }
 
     private function error(string $reason): ValidationException

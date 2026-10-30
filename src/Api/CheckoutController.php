@@ -24,7 +24,8 @@ class CheckoutController implements RequestHandlerInterface
         return new JsonResponse(['data' => $this->checkout->start(
             $this->actor($request),
             (int) ($body['priceId'] ?? 0),
-            (string) ($body['provider'] ?? '')
+            (string) ($body['provider'] ?? ''),
+            array_intersect_key($body, array_flip(['amount', 'context', 'coupon', 'giftTo'])),
         )]);
     }
 }

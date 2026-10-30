@@ -27,7 +27,10 @@ class Price extends AbstractModel
     public const FIXED_TERM = 'fixed_term';
     public const RECURRING = 'recurring';
 
-    public const KINDS = [self::ONE_OFF, self::FIXED_TERM, self::RECURRING];
+    /** One-time, the buyer chooses the amount; amount_cents is the minimum. Tips and bounties. */
+    public const CUSTOM = 'custom';
+
+    public const KINDS = [self::ONE_OFF, self::FIXED_TERM, self::RECURRING, self::CUSTOM];
     public const INTERVALS = ['day', 'week', 'month', 'year'];
 
     protected $table = 'kiosk_prices';

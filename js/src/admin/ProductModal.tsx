@@ -381,7 +381,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
 
   priceRow(p: PriceRow, i: number): Mithril.Children {
     const kinds: Record<string, string> = {};
-    ['recurring', 'one_off', 'fixed_term'].forEach((k) => (kinds[k] = extractText(t('admin.product.kind.' + k))));
+    ['recurring', 'one_off', 'fixed_term', 'custom'].forEach((k) => (kinds[k] = extractText(t('admin.product.kind.' + k))));
     const intervals: Record<string, string> = {};
     ['day', 'week', 'month', 'year'].forEach((k) => (intervals[k] = extractText(t('admin.product.interval.' + k))));
     const currencies: Record<string, string> = {};

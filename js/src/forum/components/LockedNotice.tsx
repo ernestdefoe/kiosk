@@ -13,6 +13,10 @@ export interface LockedNoticeAttrs extends ComponentAttrs {
   id: number;
   /** What to call the item in the heading. */
   name?: string;
+  /** Heading instead of "{name} is for members". */
+  title?: Mithril.Children;
+  /** What a purchase is for (a tip backs a discussion). */
+  context?: { type: string; id: number };
 }
 
 /**
@@ -52,11 +56,11 @@ export default class LockedNotice extends Component<LockedNoticeAttrs> {
       <section className="KioskLocked">
         <h2 className="KioskLocked-title">
           <Icon name="fas fa-lock" />
-          {this.attrs.name ? t('forum.locked.title_named', { name: this.attrs.name }) : t('forum.locked.title')}
+          {this.attrs.title || (this.attrs.name ? t('forum.locked.title_named', { name: this.attrs.name }) : t('forum.locked.title'))}
         </h2>
         <div className="KioskGrid">
           {this.products.map((product) => (
-            <ProductCard product={product} meta={this.meta!} />
+            <ProductCard product={product} meta={this.meta!} context={this.attrs.context} />
           ))}
         </div>
       </section>

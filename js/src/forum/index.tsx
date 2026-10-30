@@ -7,6 +7,7 @@ import { t } from '../common/t';
 import { PurchaseNotification } from './notifications';
 import lockedTags from './lockedTags';
 import teaser from './teaser';
+import tagActions from './tagActions';
 
 export { default as ProductCard } from './components/ProductCard';
 export { default as LockedNotice } from './components/LockedNotice';
@@ -26,6 +27,7 @@ app.initializers.add('ernestdefoe-kiosk', () => {
   // Harmless without flarum/tags: the list is empty and its TagsPage never loads.
   lockedTags();
   teaser();
+  tagActions();
 
   extend(IndexSidebar.prototype, 'navItems', function (items) {
     if (app.forum.attribute('kioskShowNav') === false) return;

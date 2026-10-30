@@ -1,6 +1,6 @@
 import app from 'flarum/common/app';
 
-export type Kind = 'one_off' | 'fixed_term' | 'recurring';
+export type Kind = 'one_off' | 'fixed_term' | 'recurring' | 'custom';
 export type Interval = 'day' | 'week' | 'month' | 'year';
 
 export interface Price {
@@ -97,8 +97,21 @@ export function call<T>(method: string, path: string, body?: object, params?: Re
 }
 
 export const store = (lookup?: { type: string; id: number }) => call<{ data: Product[]; meta: StoreMeta }>('GET', '/store', undefined, lookup);
-export const checkout = (priceId: number, provider: string) =>
-  call<{ data: { url: string; number: string } }>('POST', '/checkout', { priceId, provider });
+export interface CheckoutOptions {
+  amount?: string;
+  context?: { type: string; id: number };
+  coupon?: string;
+  giftTo?: string;
+}
+
+export const checkout = (priceId: number, provider: string, options: CheckoutOptions = {}) =>
+  call<{ data: { url: string; number: string } }>('POST', '/checkout', { priceId, provider, ...options });
+export const bump = (discussionId: number) => call<{ data: { bumpedAt: string; bumpsLeft: number } }>('POST', `/discussions/${discussionId}/bump`);
+export const tips = (discussionId: number) =>
+  call<{ data: { canTip: boolean; raised: { currency: string; totalCents: number; backers: number }[] } }>(
+    'GET',
+    `/discussions/${discussionId}/tips`
+  );
 export const myPurchases = () => call<{ data: Purchase[] }>('GET', '/purchases');
 export const purchase = (number: string) => call<{ data: Purchase }>('GET', `/purchases/${number}`);
 export const confirm = (number: string) => call<{ data: Purchase }>('POST', `/purchases/${number}/confirm`);

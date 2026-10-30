@@ -7,13 +7,15 @@ import classList from 'flarum/common/utils/classList';
 import type Mithril from 'mithril';
 import { t } from '../../common/t';
 import { priceLabel } from '../../common/money';
-import type { Price, Product, StoreMeta } from '../../common/api';
+import type { CheckoutOptions, Price, Product, StoreMeta } from '../../common/api';
 import { buy } from './buy';
 
 export interface ProductCardAttrs extends ComponentAttrs {
   product: Product;
   meta: StoreMeta;
   highlight?: boolean;
+  /** What a tip backs: passed through to checkout. */
+  context?: CheckoutOptions['context'];
 }
 
 /**
@@ -24,6 +26,7 @@ export interface ProductCardAttrs extends ComponentAttrs {
 export default class ProductCard extends Component<ProductCardAttrs> {
   selected: Price | null = null;
   busy = false;
+  amount = '';
 
   oninit(vnode: Mithril.Vnode<ProductCardAttrs, this>) {
     super.oninit(vnode);
@@ -32,7 +35,7 @@ export default class ProductCard extends Component<ProductCardAttrs> {
 
   view() {
     const { product, meta, highlight } = this.attrs;
-    const owned = meta.owned.includes(product.id);
+    const owned = meta.owned.includes(product.id) && !product.prices.some((p) => p.kind === 'custom');
     const style = product.color ? { '--kiosk-accent': product.color } : undefined;
 
     return (
@@ -101,6 +104,22 @@ export default class ProductCard extends Component<ProductCardAttrs> {
             </p>
           ) : null}
 
+          {this.selected?.kind === 'custom' && !owned ? (
+            <label className="KioskCard-amount">
+              <span>{t('forum.card.your_amount')}</span>
+              <input
+                className="FormControl"
+                type="number"
+                inputmode="decimal"
+                min={this.selected.amountCents / 100}
+                step="0.01"
+                placeholder={String(this.selected.amountCents / 100)}
+                value={this.amount}
+                oninput={(e: InputEvent) => (this.amount = (e.target as HTMLInputElement).value)}
+              />
+            </label>
+          ) : null}
+
           {this.action(owned)}
         </div>
       </article>
@@ -132,7 +151,10 @@ export default class ProductCard extends Component<ProductCardAttrs> {
         loading={this.busy}
         disabled={!this.selected}
         onclick={() => {
-          const started = this.selected && buy(product, this.selected, meta);
+          const options: CheckoutOptions = {};
+          if (this.selected?.kind === 'custom') options.amount = this.amount || String(this.selected.amountCents / 100);
+          if (this.attrs.context) options.context = this.attrs.context;
+          const started = this.selected && buy(product, this.selected, meta, options);
           if (!started) return;
           this.busy = true;
           // Success leaves the page for the provider's; only a failure comes back here.

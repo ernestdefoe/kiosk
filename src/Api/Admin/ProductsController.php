@@ -50,6 +50,7 @@ class ProductsController implements RequestHandlerInterface
             Product::query()->findOrFail($this->routeId($request))->delete();
             $this->paidTags->forget();
             resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->forget();
+            resolve(\Ernestdefoe\Kiosk\Service\Credits::class)->forget();
 
             return new EmptyResponse(204);
         }

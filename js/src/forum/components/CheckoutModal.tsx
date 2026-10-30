@@ -4,13 +4,14 @@ import Button from 'flarum/common/components/Button';
 import type Mithril from 'mithril';
 import { t } from '../../common/t';
 import { priceLabel } from '../../common/money';
-import type { Price, Product, StoreMeta } from '../../common/api';
+import type { CheckoutOptions, Price, Product, StoreMeta } from '../../common/api';
 import { go } from './buy';
 
 interface Attrs extends IFormModalAttrs {
   product: Product;
   price: Price;
   meta: StoreMeta;
+  options?: CheckoutOptions;
 }
 
 /** Only shown when there is a choice to make: which provider, or terms to accept. */
@@ -68,7 +69,7 @@ export default class CheckoutModal extends FormModal<Attrs> {
   onsubmit(e: SubmitEvent) {
     e.preventDefault();
     this.loading = true;
-    go(this.attrs.price, this.provider).catch(() => {
+    go(this.attrs.price, this.provider, this.attrs.options || {}).catch(() => {
       this.loading = false;
       m.redraw();
     });
