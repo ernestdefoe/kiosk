@@ -72,15 +72,8 @@ return [
     (new Extend\ApiResource(\Flarum\Api\Resource\DiscussionResource::class))
         ->fields(fn () => [
             Schema\Boolean::make('kioskLocked')
-                ->get(function ($discussion, Context $context) {
-                    $gate = resolve(\Ernestdefoe\Kiosk\Service\Gate::class);
-                    // Lists load tags already: hand them over, saving a lookup per row.
-                    if ($discussion->relationLoaded('tags')) {
-                        $gate->knowTags((int) $discussion->id, $discussion->tags->pluck('id')->map(fn ($v) => (int) $v)->all());
-                    }
-
-                    return $gate->isLocked($context->getActor(), (int) $discussion->id, $discussion->user_id ? (int) $discussion->user_id : null);
-                }),
+                // Lists load tags already: the gate uses them, saving a lookup per row.
+                ->get(fn ($discussion, Context $context) => resolve(\Ernestdefoe\Kiosk\Service\Gate::class)->isDiscussionLocked($context->getActor(), $discussion)),
             // The author's bump credits for it. Only asked of the author's own
             // discussions, from what they hold (no query).
             Schema\Integer::make('kioskBumps')

@@ -16,6 +16,6 @@ class DiscussionPolicy extends AbstractPolicy
 
     public function reply(User $actor, Discussion $discussion): ?string
     {
-        return $this->gate->isLocked($actor, (int) $discussion->id, (int) $discussion->user_id) ? $this->deny() : null;
+        return $this->gate->isDiscussionLocked($actor, $discussion) ? $this->deny() : null;
     }
 }

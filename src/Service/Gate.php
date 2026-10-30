@@ -2,6 +2,7 @@
 
 namespace Ernestdefoe\Kiosk\Service;
 
+use Flarum\Discussion\Discussion;
 use Flarum\User\User;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Database\ConnectionInterface;
@@ -71,6 +72,16 @@ class Gate
         return $this->bypasses($actor) ? [] : array_values(array_diff($this->sold()['discussions'], $this->access->ids($actor, 'discussion')));
     }
 
+    /** isLocked for a discussion model, using its tags when they're already loaded (lists). */
+    public function isDiscussionLocked(User $actor, Discussion $discussion): bool
+    {
+        if ($discussion->relationLoaded('tags')) {
+            $this->tagsOf[(int) $discussion->id] ??= $discussion->tags->pluck('id')->map(fn ($v) => (int) $v)->all();
+        }
+
+        return $this->isLocked($actor, (int) $discussion->id, $discussion->user_id ? (int) $discussion->user_id : null);
+    }
+
     /** Whether this person sees only the outside of this discussion. */
     public function isLocked(User $actor, int $discussionId, ?int $authorId = null): bool
     {
@@ -106,9 +117,4 @@ class Gate
             ->pluck('tag_id')->map(fn ($v) => (int) $v)->all();
     }
 
-    /** Tell the gate a discussion's tags it already has (from an eager load), saving a lookup. @param list<int> $tagIds */
-    public function knowTags(int $discussionId, array $tagIds): void
-    {
-        $this->tagsOf[$discussionId] = $tagIds;
-    }
 }
