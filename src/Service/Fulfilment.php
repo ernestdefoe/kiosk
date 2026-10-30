@@ -200,6 +200,8 @@ class Fulfilment
         $purchase->currency = strtoupper((string) ($product->prices->first()->currency ?? 'USD'));
         $purchase->kind = $days > 0 ? Price::FIXED_TERM : Price::ONE_OFF;
         $purchase->term_days = $days > 0 ? $days : null;
+        // A team product granted comes with its team's seats.
+        $purchase->seats = max(1, (int) ($product->prices->first()->seats ?? 1));
         $purchase->provider = Purchase::GRANT;
         $purchase->status = Purchase::PENDING;
         $purchase->note = $note !== null ? mb_substr($note, 0, 191) : null;

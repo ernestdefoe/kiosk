@@ -414,3 +414,14 @@ span.KioskChip,
 .KioskPurchase-switch {
   margin-top: 12px;
 }
+
+// Cards sit on --control-bg, which is also what inputs and plain buttons
+// use: give them the page's background so they show up in every theme.
+.KioskCard,
+.KioskPurchase {
+  .FormControl,
+  .Button:not(.Button--primary):not(.Button--link):not(.Button--icon) {
+    background: var(--body-bg);
+    color: var(--text-color);
+  }
+}

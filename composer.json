@@ -1,6 +1,6 @@
 {
     "name": "ernestdefoe/kiosk",
-    "description": "Kiosk — sell anything on your Flarum forum: memberships, premium tags, groups, and whatever other extensions make sellable (Atrium albums, Social Groups, Syllabus courses). PayPal today, Stripe and crypto next. Set up in minutes.",
+    "description": "Kiosk — sell anything on your Flarum forum: memberships, premium tags, single discussions, posting passes, tips, and whatever other extensions make sellable (Atrium albums, Social Groups, Syllabus courses). PayPal, Stripe and crypto. Set up in minutes.",
     "keywords": [
         "flarum",
         "flarum-extension",
