@@ -21,6 +21,10 @@ use Ernestdefoe\Kiosk\Provider\PayPal;
 use Ernestdefoe\Kiosk\Service\Access;
 use Ernestdefoe\Kiosk\Unlock\GroupUnlock;
 use Ernestdefoe\Kiosk\Unlock\TagUnlock;
+use Ernestdefoe\Kiosk\Service\PaidTags;
+use Flarum\Api\Context;
+use Flarum\Api\Resource\ForumResource;
+use Flarum\Api\Schema;
 use Flarum\Extend;
 use Flarum\Settings\Event\Deserializing;
 use Flarum\User\User;
@@ -51,6 +55,13 @@ return [
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
+
+        // Paid tags this visitor can't see, shown locked with a Buy button.
+        (new Extend\ApiResource(ForumResource::class))
+            ->fields(fn () => [
+                Schema\Arr::make('kioskLockedTags')
+                    ->get(fn ($forum, Context $context) => resolve(PaidTags::class)->lockedFor($context->getActor())),
+            ]),
     ]),
 
     // A buyer's permissions include what they hold; a lapsed member's do not,

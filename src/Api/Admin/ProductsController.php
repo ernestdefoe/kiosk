@@ -4,6 +4,7 @@ namespace Ernestdefoe\Kiosk\Api\Admin;
 
 use Ernestdefoe\Kiosk\Api\Concerns;
 use Ernestdefoe\Kiosk\Model\Product;
+use Ernestdefoe\Kiosk\Service\PaidTags;
 use Ernestdefoe\Kiosk\Service\Presenter;
 use Ernestdefoe\Kiosk\Service\ProductSaver;
 use Laminas\Diactoros\Response\EmptyResponse;
@@ -23,7 +24,7 @@ class ProductsController implements RequestHandlerInterface
 {
     use Concerns;
 
-    public function __construct(private ProductSaver $saver, private Presenter $presenter)
+    public function __construct(private ProductSaver $saver, private Presenter $presenter, private PaidTags $paidTags)
     {
     }
 
@@ -47,6 +48,7 @@ class ProductsController implements RequestHandlerInterface
             return new JsonResponse(['data' => $this->presenter->products([$product], $actor, true)[0]]);
         } elseif ($method === 'DELETE') {
             Product::query()->findOrFail($this->routeId($request))->delete();
+            $this->paidTags->forget();
 
             return new EmptyResponse(204);
         }

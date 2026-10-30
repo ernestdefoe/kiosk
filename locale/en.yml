@@ -57,6 +57,8 @@ ernestdefoe-kiosk:
     locked:
       title: This is for members
       title_named: "{name} is for members"
+      tags_title: Members-only sections
+      see_how: See how to join
     return:
       title: Your purchase
       checking: Checking with the payment provider…

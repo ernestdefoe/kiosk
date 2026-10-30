@@ -99,4 +99,17 @@ class AccessTest extends KioskTestCase
         $this->assertSame('ended', $this->db()->table('kiosk_purchases')->value('status'));
         $this->assertFalse($this->db()->table('group_user')->where('user_id', self::BUYER)->where('group_id', self::GOLD)->exists());
     }
+
+    #[Test]
+    public function the_forum_lists_paid_tags_a_member_cannot_see_yet(): void
+    {
+        $product = $this->product([['type' => 'tag', 'targetId' => self::LOUNGE]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+
+        $locked = fn (?int $user) => array_column($this->json($this->api('GET', '/', $user))['data']['attributes']['kioskLockedTags'] ?? [], 'slug');
+        $this->assertSame(['lounge'], $locked(self::BUYER));
+        $this->assertSame([], $locked(self::STAFF));
+
+        $this->api('POST', '/kiosk/admin/grants', 1, ['user' => 'buyer', 'productId' => $product['id'], 'days' => 0]);
+        $this->assertSame([], $locked(self::BUYER));
+    }
 }

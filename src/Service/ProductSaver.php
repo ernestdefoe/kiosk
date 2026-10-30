@@ -28,6 +28,7 @@ class ProductSaver
         private ConnectionInterface $db,
         private Registry $types,
         private TranslatorInterface $translator,
+        private PaidTags $paidTags,
     ) {
     }
 
@@ -88,6 +89,8 @@ class ProductSaver
         foreach ($unlocks ?? [] as [$type, $id]) {
             $this->types->get($type)?->prepare($id);
         }
+
+        $this->paidTags->forget();
 
         return $product->refresh()->load(['unlocks', 'prices']);
     }

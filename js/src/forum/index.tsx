@@ -5,6 +5,7 @@ import SessionDropdown from 'flarum/forum/components/SessionDropdown';
 import LinkButton from 'flarum/common/components/LinkButton';
 import { t } from '../common/t';
 import { PurchaseNotification } from './notifications';
+import lockedTags from './lockedTags';
 
 export { default as ProductCard } from './components/ProductCard';
 export { default as LockedNotice } from './components/LockedNotice';
@@ -20,6 +21,9 @@ app.initializers.add('ernestdefoe-kiosk', () => {
   app.routes['kiosk.return'] = { path: '/store/return/:number', component: () => import('./pages/ReturnPage') };
 
   app.notificationComponents.kioskPurchase = PurchaseNotification;
+
+  // Harmless without flarum/tags: the list is empty and its TagsPage never loads.
+  lockedTags();
 
   extend(IndexSidebar.prototype, 'navItems', function (items) {
     if (app.forum.attribute('kioskShowNav') === false) return;
