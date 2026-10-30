@@ -65,6 +65,14 @@ A price can also be a **team plan**: give it more than one seat, and the buyer h
 | --- | --- |
 | ![The products tab](screenshots/admin-products.jpg) | ![The payments tab](screenshots/admin-payments.jpg) |
 
+| Ads at the top and below the banner | Ads after the first post and in the discussion sidebar |
+| --- | --- |
+| ![Ads on the discussion list](screenshots/ads-index.jpg) | ![Ads on a discussion](screenshots/ads-discussion.jpg) |
+
+| The Ads tab | Making an ad |
+| --- | --- |
+| ![The ads tab](screenshots/admin-ads.jpg) | ![The ad editor](screenshots/admin-ad-modal.jpg) |
+
 ## Installation
 
 ```sh
