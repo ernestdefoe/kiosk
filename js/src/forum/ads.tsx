@@ -14,7 +14,7 @@ interface Ad {
   width: number | null;
   height: number | null;
   alt: string | null;
-  link: boolean;
+  link: string | null;
   html: string | null;
 }
 
@@ -55,13 +55,17 @@ function flush() {
   if (!Object.keys(queue).length) return;
   const seen = queue;
   queue = {};
-  // keepalive: still sent when the tab is closing.
-  fetch(app.forum.attribute('apiUrl') + '/kiosk/ads/seen', {
+  send('/kiosk/ads/seen', { seen });
+}
+
+/** keepalive: still sent when the tab is closing, or a click is leaving the page. */
+function send(path: string, data: object) {
+  fetch(app.forum.attribute('apiUrl') + path, {
     method: 'POST',
     keepalive: true,
     credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': app.session.csrfToken || '' },
-    body: JSON.stringify({ data: { seen } }),
+    body: JSON.stringify({ data }),
   }).catch(() => {});
 }
 
@@ -79,10 +83,16 @@ class AdView extends Component<{ ad: Ad }> {
     const ad = this.attrs.ad;
     if (ad.kind === 'html') return <div className="KioskAd-html" />;
 
-    const img = <img src={ad.image!} width={ad.width || undefined} height={ad.height || undefined} alt={ad.alt || ''} loading="lazy" />;
+    const img = (
+      <img src={ad.image!} width={ad.width || undefined} height={ad.height || undefined} alt={ad.alt || ''} loading="lazy" decoding="async" />
+    );
+    // Left and middle clicks both open it; a right-click to copy the link doesn't count.
+    const clicked = (e: MouseEvent) => {
+      if (e.button < 2) send('/kiosk/ads/' + ad.id + '/click', {});
+    };
 
     return ad.link ? (
-      <a className="KioskAd-image" href={app.forum.attribute('apiUrl') + '/kiosk/ads/' + ad.id + '/go'} target="_blank" rel="sponsored noopener">
+      <a className="KioskAd-image" href={ad.link} target="_blank" rel="sponsored noopener" onclick={clicked} onauxclick={clicked}>
         {img}
       </a>
     ) : (

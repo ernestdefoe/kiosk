@@ -22,7 +22,7 @@ class Ads
     private const KEY = 'kiosk.ads';
 
     /** At most this many ads per location reach the page; it rotates through them. */
-    private const PER_LOCATION = 10;
+    private const PER_LOCATION = 5;
 
     /** @var array{ads: list<array<string, mixed>>, offer: ?string}|null */
     private ?array $live = null;
@@ -127,7 +127,7 @@ class Ads
                     'width' => $ad->image_width,
                     'height' => $ad->image_height,
                     'alt' => $ad->alt_text,
-                    'link' => $ad->kind === Ad::IMAGE && $ad->link_url !== null,
+                    'link' => $ad->kind === Ad::IMAGE ? $ad->link_url : null,
                     'html' => $ad->kind === Ad::HTML ? $ad->html : null,
                     'audience' => $ad->audience,
                     'starts' => $ad->starts_at?->getTimestamp(),

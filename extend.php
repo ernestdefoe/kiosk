@@ -186,7 +186,7 @@ return [
         ->delete('/kiosk/admin/ads/{id:[0-9]+}', 'kiosk.admin.ads.delete', Api\Admin\AdsController::class)
         ->post('/kiosk/admin/ads/{id:[0-9]+}/image', 'kiosk.admin.ads.image', Api\Admin\AdsController::class)
         ->post('/kiosk/ads/seen', 'kiosk.ads.seen', Api\AdsController::class)
-        ->get('/kiosk/ads/{id:[0-9]+}/go', 'kiosk.ads.go', Api\AdsController::class)
+        ->post('/kiosk/ads/{id:[0-9]+}/click', 'kiosk.ads.click', Api\AdsController::class)
         ->get('/kiosk/admin/coupons', 'kiosk.admin.coupons', Api\Admin\CouponsController::class)
         ->post('/kiosk/admin/coupons', 'kiosk.admin.coupons.create', Api\Admin\CouponsController::class)
         ->delete('/kiosk/admin/coupons/{id:[0-9]+}', 'kiosk.admin.coupons.delete', Api\Admin\CouponsController::class)

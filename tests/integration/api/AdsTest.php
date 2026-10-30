@@ -83,19 +83,20 @@ class AdsTest extends KioskTestCase
         $this->assertSame(204, $this->api('POST', '/kiosk/ads/seen', 2, ['seen' => [$ad['id'] => 3, $off['id'] => 5, 999 => 1]])->getStatusCode());
         $this->api('POST', '/kiosk/ads/seen', 2, ['seen' => [$ad['id'] => 1000]]);
 
-        $go = $this->api('GET', '/kiosk/ads/'.$ad['id'].'/go');
-        $this->assertSame(302, $go->getStatusCode());
-        $this->assertSame('https://example.com/shop', $go->getHeaderLine('Location'));
-        // The same visitor again within ten minutes: still sent there, not counted.
-        $this->api('GET', '/kiosk/ads/'.$ad['id'].'/go');
-        $this->assertSame(404, $this->api('GET', '/kiosk/ads/'.$off['id'].'/go')->getStatusCode());
+        $this->assertSame(204, $this->api('POST', '/kiosk/ads/'.$ad['id'].'/click', 2)->getStatusCode());
+        // The same visitor again within ten minutes, and an ad that isn't running: not counted.
+        $this->api('POST', '/kiosk/ads/'.$ad['id'].'/click', 2);
+        $this->api('POST', '/kiosk/ads/'.$off['id'].'/click', 2);
+        // 🚨 Never counted by a GET (an <img> in a post would count every viewer).
+        $this->assertSame(405, $this->api('GET', '/kiosk/ads/'.$ad['id'].'/click')->getStatusCode());
+        $this->assertSame('https://example.com/shop', $this->adsFor(null)[0]['link']);
 
         $row = $this->db()->table('kiosk_ad_stats')->where('ad_id', $ad['id'])->first();
-        $this->assertSame([53, 1], [(int) $row->impressions, (int) $row->clicks]);
+        $this->assertSame([13, 1], [(int) $row->impressions, (int) $row->clicks]);
         $this->assertFalse($this->db()->table('kiosk_ad_stats')->where('ad_id', $off['id'])->exists());
 
         $listed = $this->json($this->api('GET', '/kiosk/admin/ads', 1))['data'];
-        $this->assertSame([0, 53, 1], [$listed[0]['impressions'], $listed[1]['impressions'], $listed[1]['clicks']]);
+        $this->assertSame([0, 13, 1], [$listed[0]['impressions'], $listed[1]['impressions'], $listed[1]['clicks']]);
     }
 
     #[Test]
