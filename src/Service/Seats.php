@@ -10,6 +10,7 @@ use Flarum\Foundation\ValidationException;
 use Flarum\Locale\TranslatorInterface;
 use Flarum\Notification\NotificationSyncer;
 use Flarum\User\User;
+use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Database\ConnectionInterface;
 
 /**
@@ -25,6 +26,7 @@ class Seats
         private Fulfilment $fulfilment,
         private NotificationSyncer $notifications,
         private TranslatorInterface $translator,
+        private Cache $cache,
     ) {
     }
 
@@ -54,6 +56,16 @@ class Seats
         if ($this->db->table('kiosk_seats')->where('purchase_id', $purchase->id)->count() >= $purchase->seats - 1) {
             throw $this->error('seats_full');
         }
+        // A seat holder must be someone allowed to buy it (its buyer groups).
+        if ($purchase->product?->refusal($user) === 'not_eligible') {
+            throw $this->error('not_eligible');
+        }
+        // 🚨 Each seat given emails its holder: twenty an hour per purchase.
+        $key = 'kiosk.seat_adds.'.$purchase->id;
+        if ((int) $this->cache->get($key, 0) >= 20) {
+            throw $this->error('too_many');
+        }
+        $this->cache->put($key, (int) $this->cache->get($key, 0) + 1, 3600);
 
         $this->db->table('kiosk_seats')->insert(['purchase_id' => $purchase->id, 'user_id' => $user->id, 'added_at' => Carbon::now()]);
         $this->fulfilment->open($purchase);
