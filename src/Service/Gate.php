@@ -77,15 +77,23 @@ class Gate
      * serialized: every per-row check after that is free. Nothing when
      * nothing is for sale.
      *
-     * @param iterable<int> $discussionIds
+     * @param iterable<\Flarum\Database\AbstractModel> $models discussions, or posts
+     * @param string $key the attribute holding the discussion id
      */
-    public function prime(iterable $discussionIds): void
+    public function prime(iterable $models, string $key): void
     {
         if (! $this->sold()['tags']) {
             return;
         }
 
-        $missing = array_values(array_diff(array_unique(array_map('intval', [...$discussionIds])), array_keys($this->tagsOf)));
+        $ids = [];
+        foreach ($models as $model) {
+            if ($id = (int) $model->getAttribute($key)) {
+                $ids[$id] = $id;
+            }
+        }
+
+        $missing = array_values(array_diff($ids, array_keys($this->tagsOf)));
         if (! $missing) {
             return;
         }
