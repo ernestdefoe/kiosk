@@ -72,7 +72,22 @@ class WebhookController implements RequestHandlerInterface
             }
         }
 
+        // A member's events are theirs alone: their id is prefixed with the
+        // account, so one seller (who knows their own signing secret) can't
+        // claim another payee's event ids ahead of time.
         $id = $provider->eventId($event);
+        if ($account && $id !== '') {
+            $id = 'a'.$account->id.':'.$id;
+
+            // And they can't flood the forum with validly signed events.
+            $key = 'kiosk.webhooks.'.$account->id.'.'.intdiv(time(), 60);
+            $cache = resolve(\Illuminate\Contracts\Cache\Repository::class);
+            $seen = (int) $cache->get($key, 0);
+            if ($seen >= 60) {
+                return new EmptyResponse(429);
+            }
+            $cache->put($key, $seen + 1, 120);
+        }
 
         if ($id === '') {
             return new EmptyResponse(400);
