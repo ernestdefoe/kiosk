@@ -44,7 +44,13 @@ class Sellers
     {
         $chosen = array_filter(array_map('trim', explode(',', (string) $this->settings->get(self::PROVIDERS))));
         $bindable = array_values(array_filter($this->providers->keys(), function (string $key) {
-            return $this->providers->get($key) instanceof SellerProvider;
+            $provider = $this->providers->get($key);
+            // Stripe hangs members' accounts off the forum's own, with its Connect endpoint made.
+            if ($provider instanceof \Ernestdefoe\Kiosk\Provider\Stripe) {
+                return $provider->isReady() && $provider->client()->setting('connect_webhook_secret') !== '';
+            }
+
+            return $provider instanceof SellerProvider;
         }));
 
         return $chosen ? array_values(array_intersect($bindable, $chosen)) : $bindable;
