@@ -123,8 +123,20 @@ abstract class Crypto implements Provider, WebhookProvider, SellerProvider
      */
     protected function request(string $method, string $url, array $headers, ?array $json = null): ?array
     {
+        // A member's own server: public https only, no redirects, short timeouts.
+        $member = [];
+        if ($this->payee) {
+            $host = \Ernestdefoe\Kiosk\Seller\SafeHost::resolve($url);
+            if ($host === null) {
+                $this->log->warning('[kiosk] '.$this->key().' refused a request to a non-public host for seller account '.$this->payee->id);
+
+                return null;
+            }
+            $member = \Ernestdefoe\Kiosk\Seller\SafeHost::options($host);
+        }
+
         try {
-            $res = $this->http->request($method, $url, array_filter([
+            $res = $this->http->request($method, $url, $member + array_filter([
                 'headers' => $headers + ['Accept' => 'application/json'],
                 'json' => $json,
                 'timeout' => 20,

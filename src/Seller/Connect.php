@@ -113,7 +113,7 @@ class Connect
     {
         $server = rtrim(trim($server), '/');
         // 🚨 https only: the API key and every invoice go over it.
-        if (! preg_match('~^https://[^/\s?#]+(/[^\s?#]*)?$~i', $server)) {
+        if (! preg_match('~^https://[^/\s?#]+(/[^\s?#]*)?$~i', $server) || SafeHost::resolve($server) === null) {
             throw $this->invalid('url', 'btcpay_url');
         }
 
@@ -175,7 +175,17 @@ class Connect
     /** Remove a payout account. Their listings stop selling through it; buyers keep what they bought. */
     public function remove(User $seller, string $provider): void
     {
-        foreach (Account::query()->where('user_id', $seller->id)->where('provider', $provider)->get() as $account) {
+        $accounts = Account::query()->where('user_id', $seller->id)->where('provider', $provider)->get();
+
+        // Live subscriptions renew through this account: keep it until they end,
+        // or their buyers couldn't cancel and nobody could refund.
+        if (\Ernestdefoe\Kiosk\Model\Purchase::query()->whereIn('seller_account_id', $accounts->pluck('id'))
+            ->where('kind', \Ernestdefoe\Kiosk\Model\Price::RECURRING)
+            ->whereIn('status', [\Ernestdefoe\Kiosk\Model\Purchase::ACTIVE, \Ernestdefoe\Kiosk\Model\Purchase::CANCELED])->exists()) {
+            throw $this->invalid('provider', 'has_subscriptions');
+        }
+
+        foreach ($accounts as $account) {
             $this->forgetRefs($account);
             $account->delete();
         }
