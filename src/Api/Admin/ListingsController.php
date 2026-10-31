@@ -33,6 +33,7 @@ class ListingsController implements RequestHandlerInterface
             $product->review = $approve ? null : Product::REJECTED;
             $product->review_note = $approve ? null : (mb_substr(trim((string) ($body['note'] ?? '')), 0, 255) ?: null);
             $product->save();
+            $approve ? resolve(\Ernestdefoe\Kiosk\Seller\Listings::class)->approved($product) : resolve(\Ernestdefoe\Kiosk\Seller\Listings::class)->released($product);
         }
 
         $all = ($this->query($request)['review'] ?? '') === 'all';

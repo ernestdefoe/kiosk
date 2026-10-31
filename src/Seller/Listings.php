@@ -53,16 +53,41 @@ class Listings
         }
 
         $onlyToggled = $product !== null && array_keys($allowed) === ['active'];
-        $saved = $this->saver->save($product, $allowed);
+        $trusted = $seller->hasPermission(Sellers::TRUSTED);
+        // Items become sellable (a Depot file locked to buyers) only once a moderator approves.
+        $saved = $this->saver->save($product, $allowed, $trusted);
 
         $saved->seller_id = $seller->id;
         if (! $onlyToggled || $saved->review === Product::REJECTED) {
-            $saved->review = $seller->hasPermission(Sellers::TRUSTED) ? null : Product::PENDING;
+            $saved->review = $trusted ? null : Product::PENDING;
             $saved->review_note = null;
         }
         $saved->save();
 
         return $saved;
+    }
+
+    /** Approved: make its items sellable, as the admin's products are on save. */
+    public function approved(Product $product): void
+    {
+        foreach ($product->unlocks as $unlock) {
+            $this->types->get($unlock->type)?->prepare((int) $unlock->target_id);
+        }
+    }
+
+    /**
+     * Rejected or deleted: give each item back, for types that can (a Depot
+     * file stops being paid when nothing else sells it). Optional on a type:
+     * a public release(int $targetId) method.
+     */
+    public function released(Product $product): void
+    {
+        foreach ($product->unlocks as $unlock) {
+            $type = $this->types->get($unlock->type);
+            if ($type && method_exists($type, 'release')) {
+                $type->release((int) $unlock->target_id);
+            }
+        }
     }
 
     private function invalid(string $field, string $reason): ValidationException

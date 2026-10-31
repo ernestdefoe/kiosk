@@ -51,6 +51,40 @@ class Sellers
     }
 
     /**
+     * The mode a member's account with this provider is in: the forum's when
+     * the forum uses that provider itself, else live. (Only Stripe needs the
+     * forum's own account: it is the platform members' accounts hang off.)
+     */
+    public function modeFor(string $provider): string
+    {
+        $forum = $this->providers->get($provider);
+
+        if ($provider === 'stripe' || ($forum && $forum->isReady())) {
+            return $forum ? $forum->mode() : 'live';
+        }
+
+        return 'live';
+    }
+
+    /**
+     * What a buyer may pay a seller with, for a product card.
+     *
+     * @param array<string, Account> $accounts
+     * @return list<array{key: string, mode: string, recurring: bool}>
+     */
+    public function offers(array $accounts): array
+    {
+        $out = [];
+        foreach ($accounts as $account) {
+            if ($bound = $this->providers->forAccount($account)) {
+                $out[] = ['key' => $account->provider, 'mode' => $account->mode, 'recurring' => $bound->supports(\Ernestdefoe\Kiosk\Model\Price::monthly())];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Each seller's accounts that can take money now, in the mode the forum's
      * provider is in. One query for any number of sellers.
      *
@@ -68,8 +102,7 @@ class Sellers
             }
             $rows = Account::query()->whereIn('user_id', $missing)->where('status', Account::CONNECTED)->whereIn('provider', $keys ?: ['-'])->get();
             foreach ($rows as $account) {
-                $forum = $this->providers->get($account->provider);
-                $bound = $forum && $forum->mode() === $account->mode ? $this->providers->forAccount($account) : null;
+                $bound = $this->modeFor($account->provider) === $account->mode ? $this->providers->forAccount($account) : null;
                 if ($bound && $bound->isReady()) {
                     $this->ready[$account->user_id][$account->provider] = $account;
                 }

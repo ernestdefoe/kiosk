@@ -37,6 +37,9 @@ export interface Product {
   prices: Price[];
   /** Why the viewer cannot buy it now, or null. */
   refusal: null | 'unavailable' | 'sold_out' | 'login' | 'not_eligible';
+  /** A member's listing: who is paid, and the ways they can be paid. */
+  seller?: { id: number; username: string; displayName: string; avatarUrl: string | null; terms: string } | null;
+  providers?: StoreMeta['providers'] | null;
   // Admin only:
   active?: boolean;
   buyerGroupIds?: number[];
@@ -113,7 +116,8 @@ export function call<T>(method: string, path: string, body?: object, params?: Re
   return app.request<T>({ method, url: url(path), body: body ? { data: body } : undefined, params });
 }
 
-export const store = (lookup?: { type: string; id: number }) => call<{ data: Product[]; meta: StoreMeta }>('GET', '/store', undefined, lookup);
+export const store = (lookup?: { type: string; id: number } | { seller: number }) =>
+  call<{ data: Product[]; meta: StoreMeta }>('GET', '/store', undefined, lookup);
 export interface CheckoutOptions {
   amount?: string;
   context?: { type: string; id: number };
@@ -139,3 +143,58 @@ export const addSeat = (number: string, username: string) => call<{ data: Purcha
 export const removeSeat = (number: string, userId: number) => call<{ data: Purchase }>('DELETE', `/purchases/${number}/seats/${userId}`);
 export const checkCoupon = (priceId: number, code: string) =>
   call<{ data: { amountCents: number; currency: string } }>('POST', '/coupons/check', { priceId, code });
+
+export interface SellerProviderStatus {
+  key: string;
+  status: 'connected' | 'pending' | null;
+  hint: string | null;
+}
+
+export interface Listing extends Product {
+  review: null | 'pending' | 'rejected';
+  reviewNote: string | null;
+  active: boolean;
+  sold: number;
+}
+
+export interface Sale {
+  number: string;
+  productName: string;
+  amountCents: number;
+  currency: string;
+  feeCents: number;
+  provider: string;
+  status: Purchase['status'];
+  createdAt: string;
+  buyer: { username: string; displayName: string } | null;
+  refundable: boolean;
+}
+
+export interface Selling {
+  trusted: boolean;
+  feePercent: number;
+  terms: string;
+  providers: SellerProviderStatus[];
+  listings: Listing[];
+  sales: Sale[];
+}
+
+export interface OwnItem {
+  type: string;
+  id: number;
+  label: string;
+  typeLabel: string;
+}
+
+type SellingReply = { data: Selling; meta?: { redirect: string | null } };
+
+export const selling = {
+  get: () => call<SellingReply>('GET', '/selling'),
+  connect: (provider: string, fields: Record<string, string> = {}) => call<SellingReply>('POST', `/selling/accounts/${provider}`, fields),
+  remove: (provider: string) => call<void>('DELETE', `/selling/accounts/${provider}`),
+  terms: (terms: string) => call<SellingReply>('POST', '/selling/terms', { terms }),
+  items: (q: string) => call<{ data: OwnItem[] }>('GET', '/selling/items', undefined, { q }),
+  save: (id: number | null, body: object) => call<SellingReply>('POST', id ? `/selling/listings/${id}` : '/selling/listings', body),
+  remove_listing: (id: number) => call<void>('DELETE', `/selling/listings/${id}`),
+  refund: (number: string) => call<SellingReply>('POST', `/selling/sales/${number}/refund`),
+};

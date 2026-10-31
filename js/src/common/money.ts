@@ -48,3 +48,30 @@ export function date(iso: string | null | undefined): string {
 
   return isNaN(d.getTime()) ? '' : d.toLocaleDateString(app.translator.getLocale() || undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
+
+/** Every currency Kiosk takes (Money::CURRENCIES). */
+export const CURRENCIES = [
+  'USD',
+  'EUR',
+  'GBP',
+  'CAD',
+  'AUD',
+  'NZD',
+  'CHF',
+  'SEK',
+  'NOK',
+  'DKK',
+  'PLN',
+  'CZK',
+  'HUF',
+  'JPY',
+  'MXN',
+  'BRL',
+  'SGD',
+  'HKD',
+  'TWD',
+  'ILS',
+  'PHP',
+  'THB',
+  'MYR',
+];

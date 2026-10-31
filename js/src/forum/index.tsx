@@ -23,6 +23,7 @@ app.initializers.add('ernestdefoe-kiosk', () => {
   app.routes['kiosk.store'] = { path: '/store', component: () => import('./pages/StorePage') };
   app.routes['kiosk.purchases'] = { path: '/store/purchases', component: () => import('./pages/PurchasesPage') };
   app.routes['kiosk.return'] = { path: '/store/return/:number', component: () => import('./pages/ReturnPage') };
+  app.routes['kiosk.selling'] = { path: '/store/selling', component: () => import('./pages/SellingPage') };
 
   app.notificationComponents.kioskPurchase = PurchaseNotification;
 
@@ -54,6 +55,16 @@ app.initializers.add('ernestdefoe-kiosk', () => {
       </LinkButton>,
       55
     );
+
+    if (app.forum.attribute('kioskCanSell')) {
+      items.add(
+        'kiosk-selling',
+        <LinkButton href={app.route('kiosk.selling')} icon="fas fa-cash-register">
+          {t('forum.selling.title')}
+        </LinkButton>,
+        54
+      );
+    }
   });
 
   extend('flarum/forum/components/NotificationGrid', 'notificationTypes', function (items: any) {

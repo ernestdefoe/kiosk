@@ -39,6 +39,13 @@ class StripeController implements RequestHandlerInterface
         $body = $this->body($request);
         $key = trim((string) ($body['key'] ?? ''));
 
+        // Members' sales: the Connect endpoint, in the mode the forum is using.
+        if (! empty($body['sellers'])) {
+            $result = $this->stripe->connectSellers($this->url->to('api')->route('kiosk.webhooks', ['provider' => 'stripe']), $this->stripe->mode());
+
+            return new JsonResponse(['data' => $result + ['status' => self::status($this->stripe, $this->settings)]]);
+        }
+
         if ($key !== '') {
             $mode = StripeClient::modeOfKey($key);
             if ($mode === null) {
@@ -70,6 +77,8 @@ class StripeController implements RequestHandlerInterface
                 // The last four characters only, so the admin can tell keys apart.
                 'keyHint' => $key !== '' ? '…'.substr($key, -4) : null,
                 'connected' => $stripe->isConnected($mode),
+                // Members can be paid through Stripe (Connect endpoint made).
+                'sellers' => $stripe->setting('connect_webhook_secret', $mode) !== '',
             ];
         }
 

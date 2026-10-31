@@ -19,6 +19,7 @@ class SellersTest extends KioskTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        TestItemUnlock::$prepared = [];
         $this->extend(new UnlockType('test-item', TestItemUnlock::class));
         $this->setting('ernestdefoe-kiosk.sellers', '1');
         $this->prepareDatabase(['group_permission' => [['group_id' => 3, 'permission' => 'kiosk.sell']]]);
@@ -88,6 +89,9 @@ class SellersTest extends KioskTestCase
         $listing = $this->listing(['buyerGroupIds' => [1], 'stock' => 1, 'hidden' => true]);
         $row = $this->db()->table('kiosk_products')->find($listing['id']);
         $this->assertSame([null, null, 0, self::SELLER, 'pending'], [$row->buyer_group_ids, $row->stock, (int) $row->is_hidden, (int) $row->seller_id, $row->review]);
+        // Its items are made sellable only once a moderator approves.
+        $this->assertSame([], TestItemUnlock::$prepared);
+        $this->approve($listing['id']);
         $this->assertSame([201], TestItemUnlock::$prepared);
 
         // The admin's product list is the forum's own.
@@ -108,7 +112,7 @@ class SellersTest extends KioskTestCase
 
         $this->approve($listing['id']);
         $card = $this->json($this->api('GET', '/kiosk/store', self::BUYER))['data'][0];
-        $this->assertSame(['normal', ['paypal']], [$card['seller']['username'], $card['providers']]);
+        $this->assertSame(['normal', [['key' => 'paypal', 'mode' => 'sandbox', 'recurring' => true]]], [$card['seller']['username'], $card['providers']]);
 
         // No forum coupons, and not your own listing.
         $this->assertSame(422, $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $priceId, 'provider' => 'paypal', 'coupon' => 'X'])->getStatusCode());

@@ -24,8 +24,8 @@ export interface PayPalStatus {
 export interface StripeStatus {
   mode: 'test' | 'live';
   lastWebhookAt: string | null;
-  test: { keyHint: string | null; connected: boolean };
-  live: { keyHint: string | null; connected: boolean };
+  test: { keyHint: string | null; connected: boolean; sellers?: boolean };
+  live: { keyHint: string | null; connected: boolean; sellers?: boolean };
 }
 
 export interface Overview {
@@ -75,7 +75,7 @@ export const webhooks = (failed = false) => call<{ data: WebhookRow[] }>('GET', 
 export const replay = (id: number) => call<{ data: WebhookRow[] }>('POST', `/admin/webhooks/${id}/replay`);
 export const connectPayPal = (data: { mode: string; clientId?: string; secret?: string; use?: boolean }) =>
   call<{ data: { ok: boolean; mode: string; step?: string; error?: string; status: PayPalStatus } }>('POST', '/admin/paypal', data);
-export const connectStripe = (data: { key?: string; mode?: string; use?: boolean }) =>
+export const connectStripe = (data: { key?: string; mode?: string; use?: boolean; sellers?: boolean }) =>
   call<{ data: { ok: boolean; mode: string; step?: string; error?: string; status: StripeStatus } }>('POST', '/admin/stripe', data);
 
 export interface Coupon {
@@ -150,3 +150,8 @@ export const uploadAdImage = (id: number, file: File) => {
     serialize: (raw: FormData) => raw,
   });
 };
+
+export type Listing = import('../common/api').Listing;
+export const listings = (all = false) => call<{ data: Listing[] }>('GET', '/admin/listings', undefined, all ? { review: 'all' } : undefined);
+export const reviewListing = (id: number, action: 'approve' | 'reject', note = '') =>
+  call<{ data: Listing[] }>('POST', `/admin/listings/${id}`, { action, note });

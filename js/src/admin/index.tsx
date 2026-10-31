@@ -15,6 +15,16 @@ app.initializers.add('ernestdefoe-kiosk', () => {
       60
     )
     .registerPermission(
+      { icon: 'fas fa-cash-register', label: app.translator.trans('ernestdefoe-kiosk.admin.permissions.sell'), permission: 'kiosk.sell' },
+      'start',
+      -10
+    )
+    .registerPermission(
+      { icon: 'fas fa-user-check', label: app.translator.trans('ernestdefoe-kiosk.admin.permissions.sell_trusted'), permission: 'kiosk.sellTrusted' },
+      'start',
+      -11
+    )
+    .registerPermission(
       { icon: 'fas fa-eye-slash', label: app.translator.trans('ernestdefoe-kiosk.admin.permissions.ad_free'), permission: 'kiosk.adFree' },
       'view',
       -10

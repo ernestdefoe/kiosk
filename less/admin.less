@@ -673,3 +673,59 @@ button.KioskTemplate {
     min-width: 0;
   }
 }
+
+// Sellers tab: Stripe Connect for members and the listings waiting for review.
+.KioskSellers {
+  > section {
+    margin-top: 24px;
+  }
+  h3 {
+    color: var(--text-color);
+  }
+  .KioskSellers-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .KioskSellers-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .KioskSellers-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    border-radius: var(--border-radius, 6px);
+    background: var(--control-bg);
+    color: var(--text-color);
+
+    &--pending {
+      box-shadow: inset 3px 0 0 var(--primary-color);
+    }
+  }
+  .KioskSellers-main {
+    flex: 1 1 260px;
+    min-width: 0;
+
+    a {
+      color: var(--link-color, var(--primary-color));
+    }
+  }
+  .KioskSellers-description {
+    margin: 6px 0 0;
+    white-space: pre-line;
+    overflow-wrap: anywhere;
+  }
+  .KioskSellers-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: flex-start;
+  }
+}

@@ -120,6 +120,7 @@ class SellingController implements RequestHandlerInterface
 
             case 'kiosk.selling.listings.delete':
                 $product = Product::query()->where('seller_id', $actor->id)->findOrFail($this->routeId($request));
+                $this->listings->released($product);
                 // A listing anyone bought is switched off, not deleted: their receipts point at it.
                 if (Purchase::query()->where('product_id', $product->id)->exists()) {
                     $product->is_active = false;

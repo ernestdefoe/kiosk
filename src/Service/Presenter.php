@@ -36,7 +36,8 @@ class Presenter
         $tagIds = $products->flatMap(fn (Product $p) => $p->unlocks->where('type', 'tag')->pluck('target_id'))->unique()->values()->all();
         $teasers = $tagIds ? resolve(\Illuminate\Database\ConnectionInterface::class)->table('kiosk_tag_groups')->whereIn('tag_id', $tagIds)->pluck('teaser', 'tag_id')->all() : [];
 
-        $ready = resolve(\Ernestdefoe\Kiosk\Seller\Sellers::class)->readyAccounts($products->pluck('seller_id')->filter()->map(fn ($v) => (int) $v)->unique()->values()->all());
+        $sellers = resolve(\Ernestdefoe\Kiosk\Seller\Sellers::class);
+        $ready = $sellers->readyAccounts($products->pluck('seller_id')->filter()->map(fn ($v) => (int) $v)->unique()->values()->all());
 
         return $products->map(fn (Product $p) => [
             'id' => $p->id,
@@ -65,7 +66,7 @@ class Presenter
                 'avatarUrl' => $p->seller->avatar_url,
                 'terms' => (string) $p->seller->getPreference('kioskSellerTerms', ''),
             ] : null,
-            'providers' => $p->seller_id ? array_keys($ready[$p->seller_id] ?? []) : null,
+            'providers' => $p->seller_id ? $sellers->offers($ready[$p->seller_id] ?? []) : null,
         ] + ($admin ? [
             'active' => $p->is_active,
             'buyerGroupIds' => $p->buyerGroupIds(),

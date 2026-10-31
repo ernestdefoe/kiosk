@@ -41,8 +41,15 @@ export default class ProductCard extends Component<ProductCardAttrs> {
     this.selected = this.attrs.product.prices[0] || null;
   }
 
+  /** A member's listing is paid to them, with their own accounts: the forum's don't apply. */
+  meta(): StoreMeta {
+    const { product, meta } = this.attrs;
+    return product.providers ? { ...meta, providers: product.providers } : meta;
+  }
+
   view() {
-    const { product, meta, highlight } = this.attrs;
+    const { product, highlight } = this.attrs;
+    const meta = this.meta();
     const owned = meta.owned.includes(product.id) && !product.prices.some((p) => p.kind === 'custom');
     const style = product.color ? { '--kiosk-accent': product.color } : undefined;
 
@@ -58,6 +65,20 @@ export default class ProductCard extends Component<ProductCardAttrs> {
           </span>
           <h3 className="KioskCard-name">{product.name}</h3>
         </header>
+
+        {product.seller ? (
+          <p className="KioskCard-seller">
+            {t('forum.card.sold_by', {
+              name: <a href={app.route('kiosk.store', { seller: product.seller.id })}>{product.seller.displayName}</a>,
+            })}
+            {product.seller.terms ? (
+              <details className="KioskCard-terms">
+                <summary>{t('forum.card.refund_terms')}</summary>
+                <p>{product.seller.terms}</p>
+              </details>
+            ) : null}
+          </p>
+        ) : null}
 
         {product.description ? <p className="KioskCard-description">{product.description}</p> : null}
 
@@ -145,10 +166,12 @@ export default class ProductCard extends Component<ProductCardAttrs> {
 
   /** "Have a coupon?" and "Give as a gift": links that open one small field each. */
   extras(owned: boolean): Mithril.Children {
-    const { product, meta } = this.attrs;
+    const { product } = this.attrs;
+    const meta = this.meta();
     if (!app.session.user || !this.selected || product.refusal || !meta.providers.length) return null;
 
-    const canCoupon = !owned && this.selected.kind !== 'custom';
+    // The forum's coupons are for the forum's own products, not a member's money.
+    const canCoupon = !owned && this.selected.kind !== 'custom' && !product.seller;
     const canGift = this.giftable();
     if (!canCoupon && !canGift) return null;
 
@@ -239,7 +262,8 @@ export default class ProductCard extends Component<ProductCardAttrs> {
   }
 
   action(owned: boolean): Mithril.Children {
-    const { product, meta } = this.attrs;
+    const { product } = this.attrs;
+    const meta = this.meta();
 
     if (owned && !(this.extra === 'gift' && this.giftTo.trim())) {
       return (

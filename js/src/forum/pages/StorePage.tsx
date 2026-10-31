@@ -23,7 +23,9 @@ export default class StorePage extends Page {
     app.setTitle(title);
     app.history.push('kiosk.store', title);
 
-    store().then(
+    // /store?seller=12: one member's listings.
+    const seller = Number(m.route.param('seller')) || 0;
+    store(seller ? { seller } : undefined).then(
       ({ data, meta }) => {
         this.products = data;
         this.meta = meta;
@@ -54,12 +56,23 @@ export default class StorePage extends Page {
     return (
       <PageStructure className="KioskStorePage" sidebar={() => <IndexSidebar />}>
         <div className="KioskPageHead">
-          <h2 className="KioskPageHead-title">{t('forum.store.title')}</h2>
-          {app.session.user ? (
-            <LinkButton className="Button" icon="fas fa-receipt" href={app.route('kiosk.purchases')}>
-              {t('forum.purchases.title')}
-            </LinkButton>
-          ) : null}
+          <h2 className="KioskPageHead-title">
+            {this.products[0]?.seller && m.route.param('seller')
+              ? t('forum.store.by_seller', { name: this.products[0].seller.displayName })
+              : t('forum.store.title')}
+          </h2>
+          <div className="KioskPageHead-actions">
+            {app.forum.attribute('kioskCanSell') ? (
+              <LinkButton className="Button" icon="fas fa-cash-register" href={app.route('kiosk.selling')}>
+                {t('forum.selling.title')}
+              </LinkButton>
+            ) : null}
+            {app.session.user ? (
+              <LinkButton className="Button" icon="fas fa-receipt" href={app.route('kiosk.purchases')}>
+                {t('forum.purchases.title')}
+              </LinkButton>
+            ) : null}
+          </div>
         </div>
 
         {this.loading ? (

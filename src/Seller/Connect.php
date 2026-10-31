@@ -34,11 +34,12 @@ class Connect
     /** The member's account with a provider, in the forum's current mode for it (made if new). */
     public function account(User $seller, string $provider): Account
     {
-        if (! in_array($provider, $this->sellers->providerKeys(), true) || ! ($forum = $this->providers->get($provider)) || ! $forum->isReady()) {
+        // Stripe hangs members' accounts off the forum's own, so that one must be connected.
+        if (! in_array($provider, $this->sellers->providerKeys(), true) || ($provider === 'stripe' && ! $this->providers->get('stripe')?->isReady())) {
             throw $this->invalid('provider', 'provider_off');
         }
 
-        $account = Account::query()->firstOrNew(['user_id' => $seller->id, 'provider' => $provider, 'mode' => $forum->mode()]);
+        $account = Account::query()->firstOrNew(['user_id' => $seller->id, 'provider' => $provider, 'mode' => $this->sellers->modeFor($provider)]);
         if (! $account->exists) {
             $account->status = Account::PENDING;
             $account->save();

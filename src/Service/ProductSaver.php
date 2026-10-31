@@ -37,8 +37,11 @@ class ProductSaver
     ) {
     }
 
-    /** @param array<string, mixed> $data */
-    public function save(?Product $product, array $data): Product
+    /**
+     * @param array<string, mixed> $data
+     * @param bool $prepare make each item sellable now (a member's listing waits for approval)
+     */
+    public function save(?Product $product, array $data, bool $prepare = true): Product
     {
         $product ??= new Product();
         $isNew = ! $product->exists;
@@ -91,7 +94,7 @@ class ProductSaver
 
         // Make each item sellable (a tag gets its buyers' group, and becomes a
         // teaser or hidden). Outside the transaction: a type's own writes are its own.
-        foreach ($unlocks ?? [] as [$type, $id]) {
+        foreach ($prepare ? ($unlocks ?? []) : [] as [$type, $id]) {
             $unlock = $this->types->get($type);
             if ($unlock instanceof TagUnlock) {
                 $unlock->setup($id, $this->teasers[$id] ?? null);

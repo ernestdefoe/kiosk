@@ -15,13 +15,14 @@ import type { Overview, PayPalStatus, StripeStatus, WebhookRow } from './api';
 import ProductModal from './ProductModal';
 import GrantModal from './GrantModal';
 import CouponsTab from './CouponsTab';
+import SellersTab from './SellersTab';
 import AdsTab from './AdsTab';
 import CryptoCards from './CryptoCards';
 import Sortable from './sortable';
 import { TEMPLATES } from './templates';
 
-type Tab = 'overview' | 'products' | 'purchases' | 'coupons' | 'ads' | 'payments' | 'webhooks' | 'settings';
-const TABS: Tab[] = ['overview', 'products', 'purchases', 'coupons', 'ads', 'payments', 'webhooks', 'settings'];
+type Tab = 'overview' | 'products' | 'purchases' | 'coupons' | 'ads' | 'payments' | 'sellers' | 'webhooks' | 'settings';
+const TABS: Tab[] = ['overview', 'products', 'purchases', 'coupons', 'ads', 'payments', 'sellers', 'webhooks', 'settings'];
 
 const PAYPAL_APPS = 'https://developer.paypal.com/dashboard/applications';
 const STRIPE_KEYS = 'https://dashboard.stripe.com/apikeys';
@@ -145,6 +146,17 @@ export default class KioskPage extends ExtensionPage {
         return this.adsTab();
       case 'payments':
         return this.paymentsTab();
+      case 'sellers':
+        return (
+          <SellersTab
+            settings={() => this.sellerSettings()}
+            stripe={this.overview!.stripe}
+            onStripe={(status: api.StripeStatus) => {
+              this.overview!.stripe = status;
+              m.redraw();
+            }}
+          />
+        );
       case 'webhooks':
         return this.webhooksTab();
       case 'settings':
@@ -851,6 +863,54 @@ export default class KioskPage extends ExtensionPage {
           label: t('admin.settings.stripe_tax'),
           help: t('admin.settings.stripe_tax_help'),
         })}
+        {this.submitButton()}
+      </div>
+    );
+  }
+
+  /** The Sellers tab's settings, saved with the page's own Save button. */
+  sellerSettings(): Mithril.Children {
+    const keys = ['paypal', 'stripe', 'btcpay', 'nowpayments'];
+    const chosen = String(this.setting('ernestdefoe-kiosk.seller_providers')() || '')
+      .split(',')
+      .filter(Boolean);
+
+    return (
+      <div className="Form KioskSettings">
+        {this.buildSettingComponent({
+          setting: 'ernestdefoe-kiosk.sellers',
+          type: 'boolean',
+          label: t('admin.sellers.enable'),
+          help: t('admin.sellers.enable_help'),
+        })}
+        {this.buildSettingComponent({
+          setting: 'ernestdefoe-kiosk.seller_fee_percent',
+          type: 'number',
+          min: 0,
+          max: 50,
+          step: 0.5,
+          label: t('admin.sellers.fee'),
+          help: t('admin.sellers.fee_help'),
+        })}
+        <div className="Form-group">
+          <label>{t('admin.sellers.providers')}</label>
+          <p className="helpText">{t('admin.sellers.providers_help')}</p>
+          {keys.map((key) => (
+            <label className="checkbox">
+              <input
+                type="checkbox"
+                checked={!chosen.length || chosen.includes(key)}
+                onchange={(e: Event) => {
+                  const on = (e.target as HTMLInputElement).checked;
+                  const current = chosen.length ? chosen : keys;
+                  const next = on ? [...new Set([...current, key])] : current.filter((k) => k !== key);
+                  this.setting('ernestdefoe-kiosk.seller_providers')(next.length === keys.length ? '' : next.join(','));
+                }}
+              />{' '}
+              {t('lib.providers.' + key)}
+            </label>
+          ))}
+        </div>
         {this.submitButton()}
       </div>
     );

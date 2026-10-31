@@ -7,36 +7,12 @@ import Icon from 'flarum/common/components/Icon';
 import extractText from 'flarum/common/utils/extractText';
 import type Mithril from 'mithril';
 import { t } from '../common/t';
-import { priceLabel } from '../common/money';
+import { priceLabel, CURRENCIES } from '../common/money';
 import type { Kind, Interval, Product } from '../common/api';
 import { saveProduct, searchUnlocks } from './api';
 import type { UnlockType } from './api';
 
-export const CURRENCIES = [
-  'USD',
-  'EUR',
-  'GBP',
-  'CAD',
-  'AUD',
-  'NZD',
-  'CHF',
-  'SEK',
-  'NOK',
-  'DKK',
-  'PLN',
-  'CZK',
-  'HUF',
-  'JPY',
-  'MXN',
-  'BRL',
-  'SGD',
-  'HKD',
-  'TWD',
-  'ILS',
-  'PHP',
-  'THB',
-  'MYR',
-];
+export { CURRENCIES };
 
 interface PriceRow {
   id?: number;
