@@ -222,4 +222,99 @@ class SellersTest extends KioskTestCase
             ->withBody((new StreamFactory())->createStream($raw))
             ->withHeader('Stripe-Signature', 't='.$t.',v1='.hash_hmac('sha256', $t.'.'.$raw, $secret)));
     }
+
+    /** A seller with a connected PayPal account and one approved listing, made directly. */
+    private function seller(int $id): void
+    {
+        $now = \Carbon\Carbon::now();
+        $this->db()->table('users')->insertOrIgnore(['id' => $id, 'username' => 'seller'.$id, 'email' => "s$id@machine.local", 'is_email_confirmed' => 1, 'joined_at' => $now]);
+        $account = new \Ernestdefoe\Kiosk\Seller\Account(['user_id' => $id, 'provider' => 'paypal', 'mode' => 'sandbox', 'status' => 'connected']);
+        $account->setCredentials(['client_id' => 'c'.$id, 'secret' => 's'.$id, 'webhook_id' => 'WH-'.$id]);
+        $account->save();
+        $product = $this->db()->table('kiosk_products')->insertGetId(['name' => "Listing $id", 'slug' => "listing-$id", 'seller_id' => $id, 'is_active' => true, 'created_at' => $now, 'updated_at' => $now]);
+        $this->db()->table('kiosk_prices')->insert(['product_id' => $product, 'amount_cents' => 300, 'currency' => 'USD', 'kind' => 'one_off', 'created_at' => $now]);
+        $this->db()->table('kiosk_product_unlocks')->insert(['product_id' => $product, 'type' => 'test-item', 'target_id' => $id * 100 + 1]);
+    }
+
+    private function queries(?int $user, string $path, array $query = []): int
+    {
+        $this->api('GET', $path, $user, [], $query);
+        $this->db()->flushQueryLog();
+        $this->db()->enableQueryLog();
+        $this->assertSame(200, $this->api('GET', $path, $user, [], $query)->getStatusCode());
+        $n = count($this->db()->getQueryLog());
+        $this->db()->disableQueryLog();
+
+        return $n;
+    }
+
+    #[Test]
+    public function the_store_costs_the_same_for_one_seller_or_ten(): void
+    {
+        $this->api('GET', '/kiosk/store'); // boot
+        $this->seller(10);
+        $one = [$this->queries(null, '/kiosk/store'), $this->queries(self::BUYER, '/kiosk/store'), $this->queries(self::BUYER, '/discussions')];
+        $this->assertCount(1, $this->json($this->api('GET', '/kiosk/store', self::BUYER))['data']);
+
+        foreach (range(11, 19) as $id) {
+            $this->seller($id);
+        }
+        $this->assertCount(10, $this->json($this->api('GET', '/kiosk/store', self::BUYER))['data']);
+        $this->assertSame($one, [$this->queries(null, '/kiosk/store'), $this->queries(self::BUYER, '/kiosk/store'), $this->queries(self::BUYER, '/discussions')]);
+    }
+
+    #[Test]
+    public function a_checkout_link_that_isnt_https_is_never_handed_to_the_buyer(): void
+    {
+        // Ship-check: a member's own server picks some checkout links; javascript: would run on the forum.
+        $this->connectPayPal();
+        $listing = $this->listing();
+        $this->approve($listing['id']);
+        $this->paypal->answers['POST /v2/checkout/orders'] = [201, ['id' => 'ORDER-X', 'status' => 'PAYER_ACTION_REQUIRED', 'links' => [['rel' => 'payer-action', 'href' => 'javascript:alert(document.domain)']]]];
+
+        $response = $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $listing['prices'][0]['id'], 'provider' => 'paypal']);
+        $this->assertSame(422, $response->getStatusCode(), (string) $response->getBody());
+        $this->assertStringNotContainsString('javascript', (string) $response->getBody());
+        $this->assertSame(0, $this->db()->table('kiosk_purchases')->count());
+    }
+
+    #[Test]
+    public function a_sellers_event_ids_are_theirs_alone_and_accounts_with_live_subscriptions_stay(): void
+    {
+        $this->connectPayPal();
+        $account = (int) $this->db()->table('kiosk_seller_accounts')->value('id');
+        $event = ['id' => 'WH-SHARED', 'event_type' => 'PAYMENT.CAPTURE.COMPLETED', 'resource' => ['id' => 'CAP-1', 'custom_id' => 'K-NOPE']];
+        $this->boot();
+        $this->send($this->request('POST', '/api/kiosk/webhooks/paypal/'.$account, ['json' => $event])
+            ->withBody((new StreamFactory())->createStream((string) json_encode($event)))
+            ->withHeader('PAYPAL-AUTH-ALGO', 'SHA256withRSA')->withHeader('PAYPAL-CERT-URL', 'https://api.sandbox.paypal.com/v1/notifications/certs/CERT')
+            ->withHeader('PAYPAL-TRANSMISSION-ID', 'tid')->withHeader('PAYPAL-TRANSMISSION-SIG', 'sig')->withHeader('PAYPAL-TRANSMISSION-TIME', gmdate('c')));
+        $this->assertSame('a'.$account.':WH-SHARED', $this->db()->table('kiosk_webhook_events')->value('event_id'));
+
+        // The forum's own event with the same id is still the forum's to act on.
+        $this->webhook('PAYMENT.CAPTURE.COMPLETED', ['id' => 'CAP-2', 'custom_id' => 'K-NOPE'], 'WH-SHARED');
+        $this->assertSame(2, $this->db()->table('kiosk_webhook_events')->count());
+
+        $now = \Carbon\Carbon::now();
+        $this->db()->table('kiosk_purchases')->insert(['number' => 'K-SUBSCRIBED', 'user_id' => self::BUYER, 'product_name' => 'X', 'amount_cents' => 300, 'currency' => 'USD',
+            'kind' => 'recurring', 'interval' => 'month', 'provider' => 'paypal', 'status' => 'active', 'seller_id' => self::SELLER, 'seller_account_id' => $account, 'created_at' => $now, 'updated_at' => $now]);
+        $this->assertSame(422, $this->api('DELETE', '/kiosk/selling/accounts/paypal', self::SELLER)->getStatusCode());
+        $this->assertSame(1, $this->db()->table('kiosk_seller_accounts')->count());
+    }
+
+    #[Test]
+    public function a_new_listing_must_sell_something(): void
+    {
+        $response = $this->api('POST', '/kiosk/selling/listings', self::SELLER, ['name' => 'Nothing', 'prices' => [['kind' => 'one_off', 'amount' => '5', 'currency' => 'USD']]]);
+        $this->assertSame(422, $response->getStatusCode());
+    }
+
+    #[Test]
+    public function members_servers_must_be_public_https(): void
+    {
+        foreach (['http://1.1.1.1', 'https://127.0.0.1', 'https://10.0.0.5', 'https://169.254.169.254', 'https://100.64.0.1', 'https://[::1]', 'https://[::ffff:127.0.0.1]', 'https://0177.0.0.1', 'https://user:pw@1.1.1.1', 'https://localhost'] as $url) {
+            $this->assertNull(\Ernestdefoe\Kiosk\Seller\SafeHost::resolve($url), $url);
+        }
+        $this->assertSame('1.1.1.1', \Ernestdefoe\Kiosk\Seller\SafeHost::resolve('https://1.1.1.1/btcpay')['ip']);
+    }
 }
