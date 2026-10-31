@@ -30,7 +30,23 @@ trait PaysTo
     {
         $query = Purchase::query()->where('provider', $this->key());
 
-        return $this->payee ? $query->where('seller_account_id', $this->payee->id) : $query->whereNull('seller_account_id');
+        if ($this->payee) {
+            return $query->where('seller_account_id', $this->payee->id);
+        }
+
+        // The forum's own: and members it takes payments for through its own
+        // account (PayPal email payees), whose events come to its endpoint.
+        $hosted = $this->hostedAccounts();
+
+        return $hosted
+            ? $query->where(fn ($q) => $q->whereNull('seller_account_id')->orWhereIn('seller_account_id', $hosted))
+            : $query->whereNull('seller_account_id');
+    }
+
+    /** Member accounts paid through the forum's own account, as an id subquery. @return \Illuminate\Database\Eloquent\Builder<Account>|null */
+    protected function hostedAccounts(): ?Builder
+    {
+        return null;
     }
 
     /** @return Builder<Payment> */

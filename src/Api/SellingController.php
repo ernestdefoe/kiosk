@@ -85,7 +85,9 @@ class SellingController implements RequestHandlerInterface
             case 'kiosk.selling.accounts.connect':
                 $provider = $this->param($request, 'provider');
                 $url = null;
-                if ($provider === 'paypal') {
+                if ($provider === 'paypal' && isset($body['email'])) {
+                    $this->connect->paypalEmail($actor, (string) $body['email']);
+                } elseif ($provider === 'paypal') {
                     $this->connect->paypal($actor, trim((string) ($body['clientId'] ?? '')), trim((string) ($body['secret'] ?? '')));
                 } elseif ($provider === 'nowpayments') {
                     $this->connect->nowpayments($actor, trim((string) ($body['apiKey'] ?? '')), trim((string) ($body['ipnSecret'] ?? '')));
@@ -174,6 +176,8 @@ class SellingController implements RequestHandlerInterface
                 'key' => $key,
                 'status' => isset($ready[$key]) ? 'connected' : ($accounts->has($key) ? Account::PENDING : null),
                 'hint' => ($accounts->get($key)?->first()?->details['hint'] ?? null),
+                // PayPal by email alone: one-time prices only.
+                'byEmail' => (bool) ($accounts->get($key)?->first()?->details['email'] ?? false),
             ], $this->sellers->providerKeys()),
             'listings' => array_map(fn (array $p, Product $model) => $p + [
                 'review' => $model->review,

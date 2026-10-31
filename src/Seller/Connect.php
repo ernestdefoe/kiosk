@@ -55,6 +55,7 @@ class Connect
         }
 
         $account = $this->account($seller, 'paypal');
+        $account->external_id = null; // no longer paid by email alone
         $account->setCredentials(['client_id' => $clientId, 'secret' => $secret]);
 
         /** @var PayPal $bound */
@@ -67,6 +68,30 @@ class Connect
 
         $account->setCredentials(['client_id' => $clientId, 'secret' => $secret, 'webhook_id' => $result['webhook_id']]);
         $account->details = ['hint' => '…'.substr($clientId, -4)];
+
+        return $this->connected($account);
+    }
+
+    /**
+     * The simple way: just their PayPal email. The forum's own PayPal app takes
+     * each order with them as the payee, so the money still goes straight to
+     * them. One-time prices only, no forum cut, refunds made in their PayPal.
+     */
+    public function paypalEmail(User $seller, string $email): Account
+    {
+        $email = strtolower(trim($email));
+        if (! filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 150) {
+            throw $this->invalid('email', 'paypal_email');
+        }
+        // It runs on the forum's own PayPal app, so that must be connected.
+        if (! $this->providers->get('paypal')?->isReady()) {
+            throw $this->invalid('provider', 'provider_off');
+        }
+
+        $account = $this->account($seller, 'paypal');
+        $account->secrets = null;
+        $account->external_id = Account::PAYEE.$email;
+        $account->details = ['hint' => $email, 'email' => true];
 
         return $this->connected($account);
     }

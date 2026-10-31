@@ -148,6 +148,8 @@ export interface SellerProviderStatus {
   key: string;
   status: 'connected' | 'pending' | null;
   hint: string | null;
+  /** PayPal by email alone: one-time prices only. */
+  byEmail?: boolean;
 }
 
 export interface Listing extends Product {

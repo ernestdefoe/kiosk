@@ -25,7 +25,11 @@ class Refunds
             return 'nothing_to_refund';
         }
 
-        if (! $provider->refund($payment)) {
+        // Paid to a member's PayPal email: the money is in their PayPal, so they
+        // refund it there and this records it (and ends the buyer's access).
+        $byEmail = $provider instanceof \Ernestdefoe\Kiosk\Provider\PayPal && $provider->paysByEmail();
+
+        if (! $byEmail && ! $provider->refund($payment)) {
             // Crypto can only be sent back from the gateway itself.
             return $provider instanceof Crypto ? 'refund_crypto' : 'refund_failed';
         }

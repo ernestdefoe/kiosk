@@ -30,6 +30,12 @@ class Account extends AbstractModel
     /** Started but not finished (Stripe's sign-up, a PayPal webhook not made yet). */
     public const PENDING = 'pending';
 
+    /**
+     * external_id of a member paid by PayPal email alone: the forum's own
+     * PayPal app takes the order, with them as the payee.
+     */
+    public const PAYEE = 'payee:';
+
     protected $table = 'kiosk_seller_accounts';
 
     protected $guarded = [];
@@ -63,6 +69,14 @@ class Account extends AbstractModel
     public function isConnected(): bool
     {
         return $this->status === self::CONNECTED;
+    }
+
+    /** The PayPal email a member is paid at through the forum's own app, or null. */
+    public function payeeEmail(): ?string
+    {
+        return $this->provider === 'paypal' && str_starts_with((string) $this->external_id, self::PAYEE)
+            ? substr((string) $this->external_id, strlen(self::PAYEE))
+            : null;
     }
 
     /** The provider's id of this account (Stripe's acct_…), when it has one. */

@@ -16,7 +16,9 @@ import type { Listing, Sale, Selling, SellerProviderStatus } from '../../common/
 
 /** The fields each provider asks a member for. Stripe and BTCPay send them to the provider's own page instead. */
 const FIELDS: Record<string, string[]> = {
-  paypal: ['clientId', 'secret'],
+  // PayPal: just an email by default; their own app (keys) for subscriptions.
+  paypal: ['email'],
+  paypalApp: ['clientId', 'secret'],
   btcpay: ['url'],
   nowpayments: ['apiKey', 'ipnSecret'],
   stripe: [],
@@ -33,6 +35,8 @@ export default class SellingPage extends Page {
   /** Typed into a provider's form, by provider then field. */
   fields: Record<string, Record<string, string>> = {};
   terms = '';
+  /** PayPal with their own app's keys instead of an email. */
+  paypalApp = false;
 
   oninit(vnode: Mithril.Vnode) {
     super.oninit(vnode);
@@ -160,8 +164,9 @@ export default class SellingPage extends Page {
   }
 
   account(p: SellerProviderStatus): Mithril.Children {
-    const fields = FIELDS[p.key] || [];
-    const values = (this.fields[p.key] ??= {});
+    const app_ = p.key === 'paypal' && this.paypalApp;
+    const fields = FIELDS[app_ ? 'paypalApp' : p.key] || [];
+    const values = (this.fields[app_ ? 'paypalApp' : p.key] ??= {});
 
     return (
       <div className={classList('KioskPurchase', 'KioskSelling-account', { 'KioskPurchase--live': p.status === 'connected' })}>
@@ -172,14 +177,17 @@ export default class SellingPage extends Page {
           </span>
         </div>
         {p.hint ? <p className="KioskPurchase-terms">{p.hint}</p> : null}
-        <p className="helpText">{t('forum.selling.help.' + p.key)}</p>
+        <p className="helpText">
+          {t('forum.selling.help.' + (app_ ? 'paypal_app' : p.key))}
+          {p.status === 'connected' && p.byEmail ? [' ', t('forum.selling.help.paypal_email_limits')] : null}
+        </p>
 
         {p.status === 'connected' ? null : (
           <div className="KioskSelling-fields">
             {fields.map((f) => (
               <input
                 className="FormControl"
-                type={f === 'url' ? 'url' : f === 'clientId' ? 'text' : 'password'}
+                type={f === 'url' ? 'url' : f === 'email' ? 'email' : f === 'clientId' ? 'text' : 'password'}
                 autocomplete="off"
                 placeholder={extractText(t('forum.selling.field.' + f))}
                 aria-label={extractText(t('forum.selling.field.' + f))}
@@ -189,6 +197,12 @@ export default class SellingPage extends Page {
             ))}
           </div>
         )}
+
+        {p.key === 'paypal' && p.status !== 'connected' ? (
+          <Button className="Button Button--link KioskSelling-switch" onclick={() => (this.paypalApp = !this.paypalApp)}>
+            {t(this.paypalApp ? 'forum.selling.paypal_use_email' : 'forum.selling.paypal_use_app')}
+          </Button>
+        ) : null}
 
         <div className="KioskSelling-actions">
           {p.status === 'connected' ? null : (

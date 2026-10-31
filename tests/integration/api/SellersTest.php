@@ -62,7 +62,7 @@ class SellersTest extends KioskTestCase
     public function a_paypal_account_is_sealed_and_gets_its_own_webhook(): void
     {
         $data = $this->connectPayPal();
-        $this->assertSame(['key' => 'paypal', 'status' => 'connected', 'hint' => '…ABCD'], collect($data['providers'])->firstWhere('key', 'paypal'));
+        $this->assertSame(['key' => 'paypal', 'status' => 'connected', 'hint' => '…ABCD', 'byEmail' => false], collect($data['providers'])->firstWhere('key', 'paypal'));
 
         // 🚨 The secret is never in the database in the clear.
         $row = $this->db()->table('kiosk_seller_accounts')->first();
@@ -316,5 +316,48 @@ class SellersTest extends KioskTestCase
             $this->assertNull(\Ernestdefoe\Kiosk\Seller\SafeHost::resolve($url), $url);
         }
         $this->assertSame('1.1.1.1', \Ernestdefoe\Kiosk\Seller\SafeHost::resolve('https://1.1.1.1/btcpay')['ip']);
+    }
+
+    #[Test]
+    public function a_seller_can_be_paid_at_just_their_paypal_email_for_one_time_prices(): void
+    {
+        $data = $this->json($this->api('POST', '/kiosk/selling/accounts/paypal', self::SELLER, ['email' => 'Seller@Example.com']))['data'];
+        $this->assertSame(['connected', 'seller@example.com', true], [$data['providers'][0]['status'], $data['providers'][0]['hint'], $data['providers'][0]['byEmail']]);
+        $this->assertNull($this->db()->table('kiosk_seller_accounts')->value('secrets'));
+
+        $listing = $this->listing(['prices' => [['kind' => 'one_off', 'amount' => '8.00', 'currency' => 'USD'], ['kind' => 'recurring', 'interval' => 'month', 'amount' => '2.00', 'currency' => 'USD']]]);
+        $this->approve($listing['id']);
+        $card = $this->json($this->api('GET', '/kiosk/store', self::BUYER))['data'][0];
+        $this->assertSame([['key' => 'paypal', 'mode' => 'sandbox', 'recurring' => false]], $card['providers']);
+
+        // A subscription can't go to an email payee.
+        $this->assertSame(422, $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $listing['prices'][1]['id'], 'provider' => 'paypal'])->getStatusCode());
+
+        $this->paypal->calls = [];
+        $this->paypal->captureValue = '8.00';
+        $start = $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $listing['prices'][0]['id'], 'provider' => 'paypal']);
+        $this->assertSame(200, $start->getStatusCode(), (string) $start->getBody());
+        $number = $this->json($start)['data']['number'];
+
+        // The forum's own app makes the order; the seller is the payee.
+        $order = collect($this->paypal->calls)->firstWhere('path', '/v2/checkout/orders');
+        $this->assertSame(['email_address' => 'seller@example.com'], $order['body']['purchase_units'][0]['payee']);
+        $this->assertSame('Basic '.base64_encode('client:secret'), collect($this->paypal->calls)->firstWhere('path', '/v1/oauth2/token')['headers']['Authorization'][0]);
+
+        // Its events come to the forum's endpoint, which may act on it.
+        $ref = $this->db()->table('kiosk_purchases')->where('number', $number)->value('provider_ref');
+        $this->webhook('PAYMENT.CAPTURE.COMPLETED', ['id' => 'CAP-E', 'custom_id' => $number, 'status' => 'COMPLETED', 'amount' => ['currency_code' => 'USD', 'value' => '8.00'],
+            'links' => [['rel' => 'up', 'href' => 'https://api.sandbox.paypal.com/v2/checkout/orders/'.$ref]]]);
+        $this->assertSame('active', $this->db()->table('kiosk_purchases')->where('number', $number)->value('status'));
+
+        // The seller refunds in their PayPal; Refund here records it without asking PayPal.
+        $this->paypal->calls = [];
+        $this->assertSame(200, $this->api('POST', '/kiosk/selling/sales/'.$number.'/refund', self::SELLER)->getStatusCode());
+        $this->assertSame('refunded', $this->db()->table('kiosk_purchases')->where('number', $number)->value('status'));
+        $this->assertNull(collect($this->paypal->calls)->first(fn ($c) => str_ends_with($c['path'], '/refund')));
+
+        // Switching to their own app's keys stops the email payee.
+        $this->connectPayPal();
+        $this->assertNull($this->db()->table('kiosk_seller_accounts')->value('external_id'));
     }
 }

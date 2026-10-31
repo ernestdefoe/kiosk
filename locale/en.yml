@@ -123,11 +123,14 @@ ernestdefoe-kiosk:
         pending: Not finished
         none: Not connected
       help:
-        paypal: "In your PayPal developer dashboard, create a REST app (Apps & Credentials), then paste its Client ID and Secret here."
+        paypal: "Enter the email address of your PayPal account. Buyers pay you there directly. One-time prices only."
+        paypal_app: "For monthly or yearly prices too: in your PayPal developer dashboard, create a REST app (Apps & Credentials), then paste its Client ID and Secret here."
+        paypal_email_limits: "Paid by email, so one-time prices only. To refund a buyer, refund them in your PayPal, then press Refund on the sale here to end their access."
         stripe: "You'll sign up (or sign in) on Stripe's own pages. Stripe asks for your details and bank account, not this forum."
         btcpay: "Enter your BTCPay Server's address. You'll pick your store and approve access on your server."
         nowpayments: "In your NOWPayments dashboard, create an API key and an IPN secret, and paste both here."
       field:
+        email: Your PayPal email
         clientId: Client ID
         secret: Secret
         url: "https://your-btcpay-server.com"
@@ -135,6 +138,8 @@ ernestdefoe-kiosk:
         ipnSecret: IPN secret
       connect: "Connect {provider}"
       continue_to: "Continue to {provider}"
+      paypal_use_app: Use your own PayPal app instead (for monthly or yearly prices)
+      paypal_use_email: Use just your PayPal email instead
       remove: Remove
       remove_confirm: "Remove your {provider} account? Your listings stop selling through it. Buyers keep what they bought."
       terms: Refunds and support
@@ -183,6 +188,7 @@ ernestdefoe-kiosk:
       errors:
         provider_off: That payment provider isn't available for selling here.
         paypal_keys: Paste your PayPal app's Client ID and Secret.
+        paypal_email: Enter the email address of your PayPal account.
         paypal_rejected: "PayPal didn't accept those keys. Check both are from the same app, and that they're live keys unless this forum is in test mode."
         paypal_webhook: PayPal wouldn't send payment notifications to this forum. Ask the forum's staff to check the forum uses https.
         stripe_connect: Stripe couldn't start your sign-up. Try again in a moment.

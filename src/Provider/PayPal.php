@@ -61,9 +61,27 @@ class PayPal implements Provider, WebhookProvider, SellerProvider
     {
         $copy = clone $this;
         $copy->payee = $account;
-        $copy->api = $this->api->forCredentials($account->credentials(), $account->mode);
+        $copy->payeeEmail = $account->payeeEmail();
+        // Paid by email: the forum's own app takes the order, the member is the payee.
+        if ($copy->payeeEmail === null) {
+            $copy->api = $this->api->forCredentials($account->credentials(), $account->mode);
+        }
 
         return $copy;
+    }
+
+    /** A member paid at their PayPal email through the forum's own app (one-time prices only). */
+    private ?string $payeeEmail = null;
+
+    public function paysByEmail(): bool
+    {
+        return $this->payeeEmail !== null;
+    }
+
+    /** The forum's app also takes email payees' orders: their events come to its endpoint. */
+    protected function hostedAccounts(): ?\Illuminate\Database\Eloquent\Builder
+    {
+        return Account::query()->select('id')->where('provider', 'paypal')->where('external_id', 'like', Account::PAYEE.'%');
     }
 
     public function mode(): string
@@ -80,6 +98,11 @@ class PayPal implements Provider, WebhookProvider, SellerProvider
     {
         if (! $price->isRecurring()) {
             return true;
+        }
+
+        // A PayPal subscription belongs to the app that made it: an email payee can't be billed through the forum's.
+        if ($this->payeeEmail !== null) {
+            return false;
         }
 
         // PayPal's longest billing cycles.
@@ -106,7 +129,7 @@ class PayPal implements Provider, WebhookProvider, SellerProvider
                 'custom_id' => $purchase->number,
                 'description' => mb_substr($purchase->product_name, 0, 127),
                 'amount' => ['currency_code' => $purchase->currency, 'value' => Money::toDecimal($purchase->amount_cents, $purchase->currency)],
-            ]],
+            ] + ($this->payeeEmail !== null ? ['payee' => ['email_address' => $this->payeeEmail]] : [])],
             'payment_source' => ['paypal' => ['experience_context' => [
                 'brand_name' => $this->brand(),
                 'shipping_preference' => 'NO_SHIPPING',
@@ -540,6 +563,11 @@ class PayPal implements Provider, WebhookProvider, SellerProvider
 
     public function refund(Payment $payment): bool
     {
+        // The money is in the member's PayPal, not the forum's: they refund it there.
+        if ($this->payeeEmail !== null) {
+            return false;
+        }
+
         $purchase = $payment->purchase;
         $sale = $purchase && $purchase->isRecurring();
 
