@@ -237,6 +237,9 @@ return [
             $event->everyTenMinutes()->withoutOverlapping();
         }),
 
+    // A seller's refund and support terms, shown on their listings.
+    (new Extend\User())->registerPreference('kioskSellerTerms', fn ($value) => mb_substr((string) $value, 0, 2000), ''),
+
     (new Extend\Settings())
         ->default('ernestdefoe-kiosk.grace_days', 3)
         ->default(\Ernestdefoe\Kiosk\Seller\Sellers::ENABLED, false)

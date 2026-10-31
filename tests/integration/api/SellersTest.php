@@ -111,7 +111,9 @@ class SellersTest extends KioskTestCase
         $this->assertSame(422, $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $priceId, 'provider' => 'paypal'])->getStatusCode());
 
         $this->approve($listing['id']);
+        $this->assertSame('Refunds within 14 days.', $this->json($this->api('POST', '/kiosk/selling/terms', self::SELLER, ['terms' => 'Refunds within 14 days.']))['data']['terms']);
         $card = $this->json($this->api('GET', '/kiosk/store', self::BUYER))['data'][0];
+        $this->assertSame('Refunds within 14 days.', $card['seller']['terms']);
         $this->assertSame(['normal', [['key' => 'paypal', 'mode' => 'sandbox', 'recurring' => true]]], [$card['seller']['username'], $card['providers']]);
 
         // No forum coupons, and not your own listing.
