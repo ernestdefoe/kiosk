@@ -509,6 +509,11 @@ class Stripe implements Provider, WebhookProvider, SellerProvider
             return false;
         }
 
+        // A member's sale: the forum gives back its cut with the buyer's money.
+        if ($this->payee) {
+            $param['refund_application_fee'] = true;
+        }
+
         $refund = $this->api->call('POST', '/v1/refunds', $param, 'kiosk-refund-'.$payment->id, $payment->purchase?->mode);
 
         return $refund !== null && ($refund['_status'] ?? 500) < 300;
