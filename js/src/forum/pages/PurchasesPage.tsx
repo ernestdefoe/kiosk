@@ -10,7 +10,7 @@ import classList from 'flarum/common/utils/classList';
 import type Mithril from 'mithril';
 import { t } from '../../common/t';
 import { date, money, priceLabel } from '../../common/money';
-import { addSeat, cancel, myPurchases, removeSeat, store, switchPlan } from '../../common/api';
+import { addSeat, cancel, goTo, myPurchases, removeSeat, store, switchPlan } from '../../common/api';
 import type { Price, Purchase } from '../../common/api';
 
 /** /store/purchases — what the member holds, when it renews or ends, and their payments. */
@@ -230,7 +230,7 @@ export default class PurchasesPage extends Page {
     return action().then(
       ({ data }) => {
         if ('url' in data) {
-          window.location.href = data.url;
+          goTo(data.url);
           return;
         }
         this.purchases = this.purchases.map((x) => (x.number === data.number ? data : x));

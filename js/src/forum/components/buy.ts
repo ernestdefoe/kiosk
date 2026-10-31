@@ -1,5 +1,5 @@
 import app from 'flarum/forum/app';
-import { checkout } from '../../common/api';
+import { checkout, goTo } from '../../common/api';
 import type { CheckoutOptions, Price, Product, StoreMeta } from '../../common/api';
 
 /**
@@ -31,6 +31,6 @@ export function buy(product: Product, price: Price, meta: StoreMeta, options: Ch
 
 export function go(price: Price, provider: string, options: CheckoutOptions = {}): Promise<void> {
   return checkout(price.id, provider, options).then(({ data }) => {
-    window.location.href = data.url;
+    goTo(data.url);
   });
 }

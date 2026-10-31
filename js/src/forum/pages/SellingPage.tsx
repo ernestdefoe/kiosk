@@ -11,7 +11,7 @@ import extractText from 'flarum/common/utils/extractText';
 import type Mithril from 'mithril';
 import { t } from '../../common/t';
 import { money, priceLabel } from '../../common/money';
-import { selling } from '../../common/api';
+import { goTo, selling } from '../../common/api';
 import type { Listing, Sale, Selling, SellerProviderStatus } from '../../common/api';
 
 /** The fields each provider asks a member for. Stripe and BTCPay send them to the provider's own page instead. */
@@ -62,7 +62,7 @@ export default class SellingPage extends Page {
     return request.then(
       ({ data, meta }) => {
         if (meta?.redirect) {
-          window.location.href = meta.redirect;
+          goTo(meta.redirect);
           return;
         }
         this.data = data;

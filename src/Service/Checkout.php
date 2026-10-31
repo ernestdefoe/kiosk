@@ -179,6 +179,13 @@ class Checkout
 
         try {
             $link = $provider->checkout($purchase, $price, $product, $return, $cancel);
+
+            // 🚨 The buyer's browser goes wherever this says. A member's own
+            // server (their BTCPay) chooses it, so: https only, and for BTCPay
+            // only on the server they connected. Never javascript: or data:.
+            if (! self::safeLink($link, $account)) {
+                throw $this->error('provider_unavailable');
+            }
         } catch (\Throwable $e) {
             // Nothing was charged; don't leave a row that looks like a sale.
             $purchase->delete();
@@ -188,6 +195,21 @@ class Checkout
         }
 
         return ['url' => $link, 'number' => $purchase->number];
+    }
+
+    /** Where the buyer may be sent: https, and for a member's BTCPay only their own server. */
+    private static function safeLink(string $link, ?\Ernestdefoe\Kiosk\Seller\Account $account): bool
+    {
+        $parts = parse_url($link);
+        if (! is_array($parts) || strtolower($parts['scheme'] ?? '') !== 'https' || empty($parts['host']) || preg_match('/[\x00-\x20]/', $link)) {
+            return false;
+        }
+
+        if ($account && $account->provider === 'btcpay') {
+            return strcasecmp((string) $parts['host'], (string) parse_url((string) ($account->credentials()['url'] ?? ''), PHP_URL_HOST)) === 0;
+        }
+
+        return true;
     }
 
     /**

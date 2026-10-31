@@ -198,3 +198,13 @@ export const selling = {
   remove_listing: (id: number) => call<void>('DELETE', `/selling/listings/${id}`),
   refund: (number: string) => call<SellingReply>('POST', `/selling/sales/${number}/refund`),
 };
+
+/**
+ * Send the browser to a provider's page. 🚨 Only https: a member's own
+ * payment server picks some of these addresses, and javascript: or data:
+ * would run on the forum's origin.
+ */
+export function goTo(url: string | null | undefined): void {
+  if (url && /^https:\/\/[^\s]+$/i.test(url)) window.location.href = url;
+  else app.alerts.show({ type: 'error' }, app.translator.trans('ernestdefoe-kiosk.forum.errors.provider_unavailable'));
+}
