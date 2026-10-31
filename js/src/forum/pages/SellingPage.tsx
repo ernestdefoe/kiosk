@@ -177,10 +177,13 @@ export default class SellingPage extends Page {
           </span>
         </div>
         {p.hint ? <p className="KioskPurchase-terms">{p.hint}</p> : null}
-        <p className="helpText">
-          {t('forum.selling.help.' + (app_ ? 'paypal_app' : p.key))}
-          {p.status === 'connected' && p.byEmail ? [' ', t('forum.selling.help.paypal_email_limits')] : null}
-        </p>
+        {p.status === 'connected' ? (
+          p.byEmail ? (
+            <p className="helpText">{t('forum.selling.help.paypal_email_limits')}</p>
+          ) : null
+        ) : (
+          <p className="helpText">{t('forum.selling.help.' + (app_ ? 'paypal_app' : p.key))}</p>
+        )}
 
         {p.status === 'connected' ? null : (
           <div className="KioskSelling-fields">
