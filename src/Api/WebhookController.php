@@ -80,13 +80,13 @@ class WebhookController implements RequestHandlerInterface
             $id = 'a'.$account->id.':'.$id;
 
             // And they can't flood the forum with validly signed events.
-            $key = 'kiosk.webhooks.'.$account->id.'.'.intdiv(time(), 60);
+            $bucket = 'kiosk.webhooks.'.$account->id.'.'.intdiv(time(), 60);
             $cache = resolve(\Illuminate\Contracts\Cache\Repository::class);
-            $seen = (int) $cache->get($key, 0);
+            $seen = (int) $cache->get($bucket, 0);
             if ($seen >= 60) {
                 return new EmptyResponse(429);
             }
-            $cache->put($key, $seen + 1, 120);
+            $cache->put($bucket, $seen + 1, 120);
         }
 
         if ($id === '') {

@@ -227,7 +227,7 @@ class SellersTest extends KioskTestCase
     private function seller(int $id): void
     {
         $now = \Carbon\Carbon::now();
-        $this->db()->table('users')->insertOrIgnore(['id' => $id, 'username' => 'seller'.$id, 'email' => "s$id@machine.local", 'is_email_confirmed' => 1, 'joined_at' => $now]);
+        $this->db()->table('users')->insertOrIgnore(['id' => $id, 'username' => 'seller'.$id, 'email' => "s$id@machine.local", 'password' => 'x', 'is_email_confirmed' => 1, 'joined_at' => $now]);
         $account = new \Ernestdefoe\Kiosk\Seller\Account(['user_id' => $id, 'provider' => 'paypal', 'mode' => 'sandbox', 'status' => 'connected']);
         $account->setCredentials(['client_id' => 'c'.$id, 'secret' => 's'.$id, 'webhook_id' => 'WH-'.$id]);
         $account->save();
@@ -289,7 +289,7 @@ class SellersTest extends KioskTestCase
             ->withBody((new StreamFactory())->createStream((string) json_encode($event)))
             ->withHeader('PAYPAL-AUTH-ALGO', 'SHA256withRSA')->withHeader('PAYPAL-CERT-URL', 'https://api.sandbox.paypal.com/v1/notifications/certs/CERT')
             ->withHeader('PAYPAL-TRANSMISSION-ID', 'tid')->withHeader('PAYPAL-TRANSMISSION-SIG', 'sig')->withHeader('PAYPAL-TRANSMISSION-TIME', gmdate('c')));
-        $this->assertSame('a'.$account.':WH-SHARED', $this->db()->table('kiosk_webhook_events')->value('event_id'));
+        $this->assertSame(['paypal', 'a'.$account.':WH-SHARED'], [(string) $this->db()->table('kiosk_webhook_events')->value('provider'), $this->db()->table('kiosk_webhook_events')->value('event_id')]);
 
         // The forum's own event with the same id is still the forum's to act on.
         $this->webhook('PAYMENT.CAPTURE.COMPLETED', ['id' => 'CAP-2', 'custom_id' => 'K-NOPE'], 'WH-SHARED');
