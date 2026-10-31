@@ -73,6 +73,25 @@ class Checkout
         }
 
         $provider = $this->providers->get($providerKey);
+        $account = null;
+
+        // A member's listing: the buyer pays the seller, into the seller's
+        // own account with this provider. No forum coupons on their money.
+        if ($product->seller_id) {
+            $sellers = resolve(\Ernestdefoe\Kiosk\Seller\Sellers::class);
+            $seller = User::query()->find($product->seller_id);
+            if (! $seller || ! $sellers->maySell($seller)) {
+                throw $this->error('unavailable');
+            }
+            if ((int) $seller->id === (int) $actor->id) {
+                throw $this->error('own_listing');
+            }
+            if (trim((string) ($options['coupon'] ?? '')) !== '') {
+                throw $this->error('coupon');
+            }
+            $account = $sellers->account((int) $seller->id, $providerKey);
+            $provider = $account ? $this->providers->forAccount($account) : null;
+        }
 
         if (! $provider || ! $provider->isReady() || ! $provider->supports($price)) {
             throw $this->error('provider_unavailable');
@@ -102,6 +121,8 @@ class Checkout
         }
 
         $purchase = Purchase::start($recipient, $price, $product, $provider->key(), $provider->mode());
+        $purchase->seller_id = $product->seller_id;
+        $purchase->seller_account_id = $account?->id;
         if ($recipient !== $actor) {
             $purchase->gifted_by = $actor->id;
         }

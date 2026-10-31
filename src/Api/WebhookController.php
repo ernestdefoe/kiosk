@@ -5,6 +5,7 @@ namespace Ernestdefoe\Kiosk\Api;
 use Carbon\Carbon;
 use Ernestdefoe\Kiosk\Model\WebhookEvent;
 use Ernestdefoe\Kiosk\Provider\Providers;
+use Ernestdefoe\Kiosk\Seller\Account;
 use Ernestdefoe\Kiosk\Provider\WebhookProvider;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Illuminate\Database\QueryException;
@@ -38,6 +39,14 @@ class WebhookController implements RequestHandlerInterface
     {
         $key = $this->param($request, 'provider');
         $provider = $this->providers->get($key);
+        $account = null;
+
+        // A member's own PayPal app, BTCPay store or NOWPayments account
+        // posts to its own URL, and is checked with that account's secret.
+        if (($accountId = (int) $this->param($request, 'account')) > 0) {
+            $account = Account::query()->find($accountId);
+            $provider = $account && $account->provider === $key ? $this->providers->forAccount($account) : null;
+        }
 
         if (! $provider instanceof WebhookProvider) {
             return new EmptyResponse(404);
@@ -52,13 +61,27 @@ class WebhookController implements RequestHandlerInterface
         }
 
         $event = (array) json_decode($raw, true);
+
+        // Stripe sends a member's events to the forum's Connect endpoint and
+        // names their account in the signed event: act as that account.
+        if (! $account && is_string($event['account'] ?? null) && $event['account'] !== '') {
+            $account = Account::query()->where('provider', $key)->where('external_id', $event['account'])->first();
+            $provider = $account ? $this->providers->forAccount($account) : null;
+            if (! $provider instanceof WebhookProvider) {
+                return new EmptyResponse(200);
+            }
+        }
+
         $id = $provider->eventId($event);
 
         if ($id === '') {
             return new EmptyResponse(400);
         }
 
-        $this->settings->set("ernestdefoe-kiosk.{$key}_last_webhook_at", Carbon::now()->toIso8601String());
+        // The admin's "last heard from" is about the forum's own endpoint.
+        if (! $account) {
+            $this->settings->set("ernestdefoe-kiosk.{$key}_last_webhook_at", Carbon::now()->toIso8601String());
+        }
 
         $row = WebhookEvent::query()->where('provider', $key)->where('event_id', $id)->first();
 
@@ -73,6 +96,7 @@ class WebhookController implements RequestHandlerInterface
             $row->type = mb_substr($provider->eventType($event), 0, 100);
             $row->payload = $raw;
             $row->received_at = Carbon::now();
+            $row->account_id = $account?->id;
 
             try {
                 $row->save();

@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $currency
  * @property string $status
  * @property int $refunded_cents
+ * @property int $fee_cents
  * @property Carbon $created_at
  * @property-read Purchase|null $purchase
  */

@@ -40,6 +40,8 @@ use Illuminate\Support\Str;
  * @property string|null $coupon_code
  * @property int|null $gifted_by
  * @property int $seats
+ * @property int|null $seller_id
+ * @property int|null $seller_account_id
  * @property-read User|null $user
  * @property-read Product|null $product
  * @property-read Price|null $price

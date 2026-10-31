@@ -28,7 +28,8 @@ class WebhooksController implements RequestHandlerInterface
 
         if ($request->getMethod() === 'POST') {
             $row = WebhookEvent::query()->findOrFail($this->routeId($request));
-            $provider = $this->providers->get($row->provider);
+            $account = $row->account_id ? \Ernestdefoe\Kiosk\Seller\Account::query()->find($row->account_id) : null;
+            $provider = $account ? $this->providers->forAccount($account) : ($row->account_id ? null : $this->providers->get($row->provider));
             if ($provider instanceof WebhookProvider) {
                 WebhookController::process($row, $provider, $this->log);
             }

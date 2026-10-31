@@ -2,6 +2,11 @@
 
 namespace Ernestdefoe\Kiosk\Provider;
 
+use Ernestdefoe\Kiosk\Seller\Account;
+use Ernestdefoe\Kiosk\Seller\Fees;
+use Ernestdefoe\Kiosk\Seller\PaysTo;
+use Ernestdefoe\Kiosk\Seller\SellerProvider;
+
 use Carbon\Carbon;
 use Ernestdefoe\Kiosk\Model\Payment;
 use Ernestdefoe\Kiosk\Model\Price;
@@ -29,8 +34,10 @@ use Psr\Log\LoggerInterface;
  * 🚨 As with PayPal: the return page is never believed, webhooks are
  * signature-checked before they are read, and amounts are compared.
  */
-class Stripe implements Provider, WebhookProvider
+class Stripe implements Provider, WebhookProvider, SellerProvider
 {
+    use PaysTo;
+
     public function __construct(
         private StripeClient $api,
         private Fulfilment $fulfilment,
@@ -48,7 +55,23 @@ class Stripe implements Provider, WebhookProvider
 
     public function isReady(): bool
     {
-        return $this->api->isConnected();
+        if (! $this->api->isConnected()) {
+            return false;
+        }
+
+        // A member's account also needs the forum's Connect webhook, or their
+        // buyers' payments would never be heard about.
+        return ! $this->payee || ($this->payee->isConnected() && $this->api->setting('connect_webhook_secret') !== '');
+    }
+
+    /** A copy that charges directly on a member's connected account, taking the forum's fee. */
+    public function forAccount(Account $account): static
+    {
+        $copy = clone $this;
+        $copy->payee = $account;
+        $copy->api = $this->api->connected($account->externalId());
+
+        return $copy;
     }
 
     public function mode(): string
@@ -84,7 +107,8 @@ class Stripe implements Provider, WebhookProvider
 
         // Stripe Tax, when the owner turned it on: Stripe works out and adds
         // the tax for the buyer's address. Kiosk still asks for its price.
-        if ($this->settings->get('ernestdefoe-kiosk.stripe_tax')) {
+        // (Not on a member's sale: their tax is theirs, set up in their account.)
+        if (! $this->payee && $this->settings->get('ernestdefoe-kiosk.stripe_tax')) {
             $params['automatic_tax'] = ['enabled' => true];
             $params['billing_address_collection'] = 'required';
         }
@@ -94,6 +118,16 @@ class Stripe implements Provider, WebhookProvider
                 + ($price->trial_days > 0 ? ['trial_period_days' => $price->trial_days] : []);
         } else {
             $params['payment_intent_data'] = ['metadata' => ['kiosk_number' => $purchase->number], 'description' => mb_substr($purchase->product_name, 0, 200)];
+        }
+
+        // A member's sale: the forum's cut, taken by Stripe from their charge.
+        if ($this->payee) {
+            $fees = resolve(Fees::class);
+            if ($recurring && $fees->percent() > 0) {
+                $params['subscription_data']['application_fee_percent'] = $fees->percent();
+            } elseif (! $recurring && ($cut = $fees->cut($purchase->amount_cents)) > 0) {
+                $params['payment_intent_data']['application_fee_amount'] = $cut;
+            }
         }
 
         $session = $this->api->call('POST', '/v1/checkout/sessions', array_filter($params, fn ($v) => $v !== null), 'kiosk-'.$purchase->number);
@@ -139,7 +173,7 @@ class Stripe implements Provider, WebhookProvider
     private function price(Price $price, Product $product): string
     {
         $mode = $this->mode();
-        $existing = $this->db->table('kiosk_price_refs')->where(['price_id' => $price->id, 'provider' => 'stripe', 'mode' => $mode])->value('external_id');
+        $existing = $this->db->table('kiosk_price_refs')->where(['price_id' => $price->id, 'provider' => $this->refKey('stripe'), 'mode' => $mode])->value('external_id');
 
         if ($existing) {
             return (string) $existing;
@@ -153,13 +187,13 @@ class Stripe implements Provider, WebhookProvider
             'product_data' => ['name' => mb_substr($product->name, 0, 250), 'metadata' => ['kiosk_product_id' => (string) $product->id]],
             'recurring' => $price->isRecurring() ? ['interval' => $price->interval, 'interval_count' => $price->interval_count] : null,
             'metadata' => ['kiosk_price_id' => (string) $price->id],
-        ]), 'kiosk-price-'.$mode.'-'.$price->id);
+        ]), 'kiosk-price-'.$mode.'-'.$price->id.($this->payee ? '-a'.$this->payee->id : ''));
 
         if (! isset($made['id'])) {
             throw new ValidationException(['provider' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.provider_refused')]);
         }
 
-        $this->db->table('kiosk_price_refs')->insertOrIgnore(['price_id' => $price->id, 'provider' => 'stripe', 'mode' => $mode, 'external_id' => $made['id']]);
+        $this->db->table('kiosk_price_refs')->insertOrIgnore(['price_id' => $price->id, 'provider' => $this->refKey('stripe'), 'mode' => $mode, 'external_id' => $made['id']]);
 
         return (string) $made['id'];
     }
@@ -347,7 +381,22 @@ class Stripe implements Provider, WebhookProvider
      */
     public function handle(array $event): void
     {
+        // 🚨 An event from a member's connected account is acted on only by
+        // the copy bound to that account (WebhookController binds it), and the
+        // forum's own copy acts only on the forum's own events.
+        if ((string) ($event['account'] ?? '') !== ($this->payee?->externalId() ?? '')) {
+            return;
+        }
+
         $o = (array) ($event['data']['object'] ?? []);
+
+        // A member finished (or lost) Stripe's sign-up: they can sell when Stripe lets them charge.
+        if (($event['type'] ?? '') === 'account.updated' && $this->payee) {
+            $this->payee->status = ! empty($o['charges_enabled']) ? Account::CONNECTED : Account::PENDING;
+            $this->payee->save();
+
+            return;
+        }
 
         switch ((string) ($event['type'] ?? '')) {
             case 'checkout.session.completed':
@@ -397,7 +446,7 @@ class Stripe implements Provider, WebhookProvider
 
     private function refunded(string $intent, int $amount, bool $chargeback): void
     {
-        $payment = $intent !== '' ? Payment::query()->where('provider', 'stripe')->where('provider_payment_id', $intent)->first() : null;
+        $payment = $intent !== '' ? $this->ownPayments()->where('provider_payment_id', $intent)->first() : null;
 
         if (! $payment) {
             return;
@@ -421,13 +470,13 @@ class Stripe implements Provider, WebhookProvider
     private function byNumber(mixed $number): ?Purchase
     {
         return is_string($number) && $number !== ''
-            ? Purchase::query()->where('number', $number)->where('provider', 'stripe')->first()
+            ? $this->ownPurchases()->where('number', $number)->first()
             : null;
     }
 
     private function bySubscription(mixed $subId, mixed $number): ?Purchase
     {
-        return (is_string($subId) && $subId !== '' ? Purchase::query()->where('provider', 'stripe')->where('provider_ref', $subId)->first() : null)
+        return (is_string($subId) && $subId !== '' ? $this->ownPurchases()->where('provider_ref', $subId)->first() : null)
             ?? $this->byNumber($number);
     }
 

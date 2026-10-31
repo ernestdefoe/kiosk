@@ -33,11 +33,23 @@ class StripeClient
 
     public bool $rejected = false;
 
+    /** A member's connected account id (acct_…), when acting for one. */
+    private ?string $connected = null;
+
     public function __construct(
         private Client $http,
         private SettingsRepositoryInterface $settings,
         private LoggerInterface $log,
     ) {
+    }
+
+    /** A copy that acts on a member's connected account (direct charges). */
+    public function connected(string $accountId): static
+    {
+        $copy = clone $this;
+        $copy->connected = $accountId;
+
+        return $copy;
     }
 
     public function mode(): string
@@ -86,6 +98,11 @@ class StripeClient
         }
 
         $headers = ['Authorization' => 'Bearer '.$key, 'Stripe-Version' => self::API_VERSION];
+
+        // A member's connected account: the forum's key, acting on their account.
+        if ($this->connected !== null) {
+            $headers['Stripe-Account'] = $this->connected;
+        }
 
         // 🚨 A dropped reply must not let a retry make a second session or refund.
         if ($idempotencyKey !== null) {
@@ -171,16 +188,20 @@ class StripeClient
             return null;
         }
 
+        // The forum's own endpoint, then the one for members' connected
+        // accounts (Stripe signs each endpoint with its own secret).
         foreach (['live', 'test'] as $mode) {
-            $secret = $this->setting('webhook_secret', $mode);
-            if ($secret === '') {
-                continue;
-            }
+            foreach (['webhook_secret', 'connect_webhook_secret'] as $which) {
+                $secret = $this->setting($which, $mode);
+                if ($secret === '') {
+                    continue;
+                }
 
-            $expected = hash_hmac('sha256', $timestamp.'.'.$rawBody, $secret);
-            foreach ($signatures as $signature) {
-                if (hash_equals($expected, $signature)) {
-                    return $mode;
+                $expected = hash_hmac('sha256', $timestamp.'.'.$rawBody, $secret);
+                foreach ($signatures as $signature) {
+                    if (hash_equals($expected, $signature)) {
+                        return $mode;
+                    }
                 }
             }
         }
@@ -240,5 +261,81 @@ class StripeClient
         $this->settings->set(self::PREFIX.$mode.'_webhook_secret', (string) $made['secret']);
 
         return ['ok' => true, 'mode' => $mode, 'created' => true];
+    }
+
+    /**
+     * Members' sales: a second webhook endpoint, for events on connected
+     * accounts (Stripe sends those only to an endpoint made with connect=true).
+     * It lives at its own URL so connect() above, which replaces the forum's
+     * endpoint by URL, never deletes it. Fails when Connect isn't switched on
+     * in the forum's Stripe dashboard yet.
+     *
+     * @return array{ok: bool, mode: string, step?: string, error?: string}
+     */
+    public function connectSellers(string $webhookUrl, string $mode): array
+    {
+        $url = $webhookUrl.'?connect=1';
+        $list = $this->call('GET', '/v1/webhook_endpoints', ['limit' => 100], null, $mode);
+
+        if ($list === null) {
+            return ['ok' => false, 'mode' => $mode, 'step' => 'unreachable'];
+        }
+
+        foreach ($list['data'] ?? [] as $endpoint) {
+            if (($endpoint['url'] ?? '') === $url) {
+                $this->call('DELETE', '/v1/webhook_endpoints/'.rawurlencode((string) $endpoint['id']), [], null, $mode);
+            }
+        }
+
+        $made = $this->call('POST', '/v1/webhook_endpoints', [
+            'url' => $url,
+            'connect' => true,
+            'enabled_events' => [...self::WEBHOOK_EVENTS, 'account.updated'],
+            'api_version' => self::API_VERSION,
+            'description' => 'Kiosk (Flarum): members\' sales',
+        ], null, $mode);
+
+        if (! isset($made['id'], $made['secret'])) {
+            return ['ok' => false, 'mode' => $mode, 'step' => 'connect', 'error' => (string) ($made['error']['message'] ?? '')];
+        }
+
+        $this->settings->set(self::PREFIX.$mode.'_connect_webhook_secret', (string) $made['secret']);
+
+        return ['ok' => true, 'mode' => $mode];
+    }
+
+    /**
+     * A member's Stripe account, made by the forum's platform account, and
+     * the link to Stripe's own sign-up for it. Stripe collects their identity
+     * and bank details; Kiosk keeps only the acct_… id.
+     *
+     * @return array{account?: string, url?: string, error?: string}
+     */
+    public function onboard(?string $accountId, string $email, string $returnUrl, string $refreshUrl): array
+    {
+        if ($accountId === null || $accountId === '') {
+            $made = $this->call('POST', '/v1/accounts', ['type' => 'standard', 'email' => $email]);
+            if (! isset($made['id'])) {
+                return ['error' => (string) ($made['error']['message'] ?? 'unreachable')];
+            }
+            $accountId = (string) $made['id'];
+        }
+
+        $link = $this->call('POST', '/v1/account_links', [
+            'account' => $accountId,
+            'type' => 'account_onboarding',
+            'return_url' => $returnUrl,
+            'refresh_url' => $refreshUrl,
+        ]);
+
+        return isset($link['url']) ? ['account' => $accountId, 'url' => (string) $link['url']] : ['account' => $accountId, 'error' => (string) ($link['error']['message'] ?? 'unreachable')];
+    }
+
+    /** Whether a member's connected account can take payments yet. */
+    public function canCharge(string $accountId): ?bool
+    {
+        $account = $this->call('GET', '/v1/accounts/'.rawurlencode($accountId));
+
+        return $account === null || ($account['_status'] ?? 500) >= 300 ? null : (bool) ($account['charges_enabled'] ?? false);
     }
 }

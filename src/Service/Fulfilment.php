@@ -166,7 +166,7 @@ class Fulfilment
             return false;
         }
 
-        $provider = resolve(\Ernestdefoe\Kiosk\Provider\Providers::class)->get($purchase->provider);
+        $provider = resolve(\Ernestdefoe\Kiosk\Provider\Providers::class)->forPurchase($purchase);
 
         if ($provider && $provider->mode() !== $purchase->mode) {
             $this->log->warning('[kiosk] '.$purchase->number.' was made in '.$purchase->mode.' mode; '.$purchase->provider.' is in '.$provider->mode().' mode now, so it opens nothing.');
@@ -233,6 +233,8 @@ class Fulfilment
             $payment->amount_cents = $amountCents;
             $payment->currency = strtoupper($currency);
             $payment->status = Payment::COMPLETED;
+            // A member's Stripe sale: the forum's cut Stripe took from it.
+            $payment->fee_cents = $purchase->seller_id && $purchase->provider === 'stripe' ? resolve(\Ernestdefoe\Kiosk\Seller\Fees::class)->cut($amountCents) : 0;
             $payment->created_at = Carbon::now();
             $payment->save();
 

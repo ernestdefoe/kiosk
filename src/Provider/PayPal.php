@@ -2,6 +2,10 @@
 
 namespace Ernestdefoe\Kiosk\Provider;
 
+use Ernestdefoe\Kiosk\Seller\Account;
+use Ernestdefoe\Kiosk\Seller\PaysTo;
+use Ernestdefoe\Kiosk\Seller\SellerProvider;
+
 use Carbon\Carbon;
 use Ernestdefoe\Kiosk\Model\Money;
 use Ernestdefoe\Kiosk\Model\Payment;
@@ -28,8 +32,10 @@ use Psr\Log\LoggerInterface;
  * (confirm), webhooks are verified with PayPal before they are read, and every
  * amount PayPal reports is compared with the amount we asked for.
  */
-class PayPal implements Provider, WebhookProvider
+class PayPal implements Provider, WebhookProvider, SellerProvider
 {
+    use PaysTo;
+
     public function __construct(
         private PayPalClient $api,
         private Fulfilment $fulfilment,
@@ -47,7 +53,17 @@ class PayPal implements Provider, WebhookProvider
 
     public function isReady(): bool
     {
-        return $this->api->isConnected();
+        return $this->api->isConnected() && (! $this->payee || $this->payee->isConnected());
+    }
+
+    /** A copy that is paid into a member's own PayPal app. */
+    public function forAccount(Account $account): static
+    {
+        $copy = clone $this;
+        $copy->payee = $account;
+        $copy->api = $this->api->forCredentials($account->credentials(), $account->mode);
+
+        return $copy;
     }
 
     public function mode(): string
@@ -154,7 +170,7 @@ class PayPal implements Provider, WebhookProvider
     {
         $mode = $this->mode();
         // A member who had the trial gets the same plan without it.
-        $ref = $price->trial_days === 0 && (int) $price->getOriginal('trial_days') > 0 ? 'paypal_notrial' : 'paypal';
+        $ref = $this->refKey($price->trial_days === 0 && (int) $price->getOriginal('trial_days') > 0 ? 'paypal_notrial' : 'paypal');
         $existing = $this->db->table('kiosk_price_refs')->where(['price_id' => $price->id, 'provider' => $ref, 'mode' => $mode])->value('external_id');
 
         if ($existing) {
@@ -165,14 +181,14 @@ class PayPal implements Provider, WebhookProvider
         // product's prices share the catalog product its first plan made.
         $sibling = $this->db->table('kiosk_price_refs')
             ->join('kiosk_prices', 'kiosk_prices.id', '=', 'kiosk_price_refs.price_id')
-            ->where(['kiosk_prices.product_id' => $product->id, 'kiosk_price_refs.mode' => $mode])->whereIn('kiosk_price_refs.provider', ['paypal', 'paypal_notrial'])
+            ->where(['kiosk_prices.product_id' => $product->id, 'kiosk_price_refs.mode' => $mode])->whereIn('kiosk_price_refs.provider', [$this->refKey('paypal'), $this->refKey('paypal_notrial')])
             ->value('kiosk_price_refs.external_id');
         $known = $sibling ? ($this->api->call('GET', '/v1/billing/plans/'.rawurlencode((string) $sibling))['product_id'] ?? null) : null;
 
         $catalog = $known ? ['id' => $known] : $this->api->call('POST', '/v1/catalogs/products', [
             'name' => mb_substr($product->name, 0, 127),
             'type' => 'DIGITAL',
-        ], 'kiosk-product-'.$mode.'-'.$price->id);
+        ], 'kiosk-product-'.$mode.'-'.$price->id.($this->payee ? '-a'.$this->payee->id : ''));
 
         if (! isset($catalog['id'])) {
             throw new ValidationException(['provider' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.provider_refused')]);
@@ -204,7 +220,7 @@ class PayPal implements Provider, WebhookProvider
                 'auto_bill_outstanding' => true,
                 'payment_failure_threshold' => 3,
             ],
-        ], 'kiosk-plan-'.$mode.'-'.$price->id.($ref === 'paypal' ? '' : '-notrial'));
+        ], 'kiosk-plan-'.$mode.'-'.$price->id.(str_starts_with($ref, 'paypal_notrial') ? '-notrial' : '').($this->payee ? '-a'.$this->payee->id : ''));
 
         if (! isset($plan['id'])) {
             throw new ValidationException(['provider' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.provider_refused')]);
@@ -420,7 +436,7 @@ class PayPal implements Provider, WebhookProvider
     private function saleCompleted(array $sale): void
     {
         $subId = (string) ($sale['billing_agreement_id'] ?? '');
-        $purchase = $subId !== '' ? Purchase::query()->where('provider', 'paypal')->where('provider_ref', $subId)->first() : null;
+        $purchase = $subId !== '' ? $this->ownPurchases()->where('provider_ref', $subId)->first() : null;
 
         if (! $purchase || empty($sale['id'])) {
             return;
@@ -445,7 +461,7 @@ class PayPal implements Provider, WebhookProvider
     /** @param array<string, mixed> $resource */
     private function refunded(string $paymentId, bool $chargeback, array $resource): void
     {
-        $payment = $paymentId !== '' ? Payment::query()->where('provider', 'paypal')->where('provider_payment_id', $paymentId)->first() : null;
+        $payment = $paymentId !== '' ? $this->ownPayments()->where('provider_payment_id', $paymentId)->first() : null;
 
         if (! $payment) {
             return;
@@ -496,7 +512,7 @@ class PayPal implements Provider, WebhookProvider
     private function byNumber(mixed $number): ?Purchase
     {
         return is_string($number) && $number !== ''
-            ? Purchase::query()->where('number', $number)->where('provider', 'paypal')->first()
+            ? $this->ownPurchases()->where('number', $number)->first()
             : null;
     }
 
@@ -505,7 +521,7 @@ class PayPal implements Provider, WebhookProvider
     {
         // 🚨 By the subscription id Kiosk was given, never by custom_id alone:
         // anyone can make a subscription on this app carrying our number.
-        return isset($r['id']) ? Purchase::query()->where('provider', 'paypal')->where('provider_ref', (string) $r['id'])->first() : null;
+        return isset($r['id']) ? $this->ownPurchases()->where('provider_ref', (string) $r['id'])->first() : null;
     }
 
     public function cancel(Purchase $purchase): bool
@@ -568,7 +584,7 @@ class PayPal implements Provider, WebhookProvider
     /** The Kiosk price a PayPal plan id was made for, in this purchase's mode. */
     private function priceOfPlan(Purchase $purchase, mixed $planId): ?Price
     {
-        $id = $planId ? $this->db->table('kiosk_price_refs')->whereIn('provider', ['paypal', 'paypal_notrial'])->where(['mode' => $purchase->mode, 'external_id' => (string) $planId])->value('price_id') : null;
+        $id = $planId ? $this->db->table('kiosk_price_refs')->whereIn('provider', [$this->refKey('paypal'), $this->refKey('paypal_notrial')])->where(['mode' => $purchase->mode, 'external_id' => (string) $planId])->value('price_id') : null;
 
         return $id ? Price::query()->find($id) : null;
     }

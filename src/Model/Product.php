@@ -23,6 +23,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property Carbon|null $available_from
  * @property Carbon|null $available_until
  * @property int $position
+ * @property int|null $seller_id
+ * @property string|null $review
+ * @property string|null $review_note
+ * @property-read User|null $seller
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ProductUnlock> $unlocks
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Price> $prices
  */
@@ -41,6 +45,17 @@ class Product extends AbstractModel
         'available_from' => 'datetime',
         'available_until' => 'datetime',
     ];
+
+    /** A member's listing waiting for a moderator, or turned down. */
+    public const PENDING = 'pending';
+
+    public const REJECTED = 'rejected';
+
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<User, $this> */
+    public function seller(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'seller_id');
+    }
 
     /** @return HasMany<ProductUnlock, $this> */
     public function unlocks(): HasMany
@@ -75,6 +90,11 @@ class Product extends AbstractModel
     public function refusal(User $actor): ?string
     {
         $now = Carbon::now();
+
+        // A member's listing: only once a moderator let it through.
+        if ($this->seller_id && $this->review !== null) {
+            return 'unavailable';
+        }
 
         if (! $this->is_active || ($this->available_from && $this->available_from->isAfter($now))) {
             return 'unavailable';

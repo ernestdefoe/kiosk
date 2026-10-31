@@ -39,6 +39,7 @@ return [
         ->css(__DIR__.'/less/forum.less')
         ->route('/store', 'kiosk.store')
         ->route('/store/purchases', 'kiosk.purchases')
+        ->route('/store/selling', 'kiosk.selling')
         ->route('/store/return/{number:K-[A-Za-z0-9]{10}}', 'kiosk.return'),
 
     // 🚨 No jsDirectory for the admin: it has no lazy chunks, and Flarum creates
@@ -63,6 +64,9 @@ return [
     // payload (cached; no query), so a page never waits on a second request.
     (new Extend\ApiResource(ForumResource::class))
         ->fields(fn () => [
+            // The "Selling" link in the store and on the profile: a member allowed to sell.
+            Schema\Boolean::make('kioskCanSell')
+                ->get(fn ($forum, \Flarum\Api\Context $context) => resolve(\Ernestdefoe\Kiosk\Seller\Sellers::class)->maySell($context->getActor())),
             Schema\Arr::make('kioskAds')
                 ->get(fn ($forum, Context $context) => resolve(\Ernestdefoe\Kiosk\Service\Ads::class)->forActor($context->getActor())),
             Schema\Str::make('kioskAdFreeProduct')
@@ -166,6 +170,7 @@ return [
         ->delete('/kiosk/purchases/{number}/seats/{userId:[0-9]+}', 'kiosk.purchases.seats.remove', Api\PurchaseController::class)
         ->post('/kiosk/coupons/check', 'kiosk.coupons.check', Api\CouponController::class)
         ->post('/kiosk/webhooks/{provider:[a-z]+}', 'kiosk.webhooks', Api\WebhookController::class)
+        ->post('/kiosk/webhooks/{provider:[a-z]+}/{account:[0-9]+}', 'kiosk.webhooks.seller', Api\WebhookController::class)
         ->post('/kiosk/discussions/{id:[0-9]+}/bump', 'kiosk.discussions.bump', Api\ActionsController::class)
         ->get('/kiosk/discussions/{id:[0-9]+}/tips', 'kiosk.discussions.tips', Api\ActionsController::class)
         ->get('/kiosk/admin/overview', 'kiosk.admin.overview', Api\Admin\OverviewController::class)
@@ -198,10 +203,25 @@ return [
         ->post('/kiosk/admin/btcpay/disconnect', 'kiosk.admin.btcpay.disconnect', Api\Admin\CryptoController::class)
         ->post('/kiosk/admin/nowpayments', 'kiosk.admin.nowpayments', Api\Admin\CryptoController::class)
         ->post('/kiosk/admin/nowpayments/disconnect', 'kiosk.admin.nowpayments.disconnect', Api\Admin\CryptoController::class)
-        ->post('/kiosk/btcpay/authorized', 'kiosk.btcpay.authorized', Api\Admin\CryptoController::class),
+        ->post('/kiosk/btcpay/authorized', 'kiosk.btcpay.authorized', Api\Admin\CryptoController::class)
+        // A member's Selling page (members' own listings, accounts and sales).
+        ->get('/kiosk/selling', 'kiosk.selling.show', Api\SellingController::class)
+        ->get('/kiosk/selling/items', 'kiosk.selling.items', Api\SellingController::class)
+        ->post('/kiosk/selling/terms', 'kiosk.selling.terms', Api\SellingController::class)
+        ->post('/kiosk/selling/accounts/{provider:[a-z]+}', 'kiosk.selling.accounts.connect', Api\SellingController::class)
+        ->delete('/kiosk/selling/accounts/{provider:[a-z]+}', 'kiosk.selling.accounts.remove', Api\SellingController::class)
+        ->get('/kiosk/selling/stripe/{account:[0-9]+}', 'kiosk.selling.stripe', Api\SellingController::class)
+        ->post('/kiosk/selling/btcpay/{account:[0-9]+}', 'kiosk.selling.btcpay', Api\SellingController::class)
+        ->post('/kiosk/selling/listings', 'kiosk.selling.listings.save', Api\SellingController::class)
+        ->post('/kiosk/selling/listings/{id:[0-9]+}', 'kiosk.selling.listings.save.id', Api\SellingController::class)
+        ->delete('/kiosk/selling/listings/{id:[0-9]+}', 'kiosk.selling.listings.delete', Api\SellingController::class)
+        ->post('/kiosk/selling/sales/{number}/refund', 'kiosk.selling.sales.refund', Api\SellingController::class)
+        // Members' listings waiting for a moderator.
+        ->get('/kiosk/admin/listings', 'kiosk.admin.listings', Api\Admin\ListingsController::class)
+        ->post('/kiosk/admin/listings/{id:[0-9]+}', 'kiosk.admin.listings.review', Api\Admin\ListingsController::class),
 
     // Providers cannot send a CSRF token; the signature check stands in for it.
-    (new Extend\Csrf())->exemptRoute('kiosk.webhooks')->exemptRoute('kiosk.btcpay.authorized'),
+    (new Extend\Csrf())->exemptRoute('kiosk.webhooks')->exemptRoute('kiosk.webhooks.seller')->exemptRoute('kiosk.btcpay.authorized')->exemptRoute('kiosk.selling.btcpay'),
 
     new Extend\ApiResource(Api\Resource\PurchaseResource::class),
 
@@ -219,6 +239,9 @@ return [
 
     (new Extend\Settings())
         ->default('ernestdefoe-kiosk.grace_days', 3)
+        ->default(\Ernestdefoe\Kiosk\Seller\Sellers::ENABLED, false)
+        ->default(\Ernestdefoe\Kiosk\Seller\Fees::PERCENT, 0)
+        ->serializeToForum('kioskSellers', \Ernestdefoe\Kiosk\Seller\Sellers::ENABLED, 'boolval')
         ->default('ernestdefoe-kiosk.show_nav', true)
         ->default('ernestdefoe-kiosk.ads_every_posts', 5)
         ->default('ernestdefoe-kiosk.ads_every_discussions', 10)

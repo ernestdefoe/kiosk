@@ -29,7 +29,8 @@ class BTCPay extends Crypto
 
     public function isReady(): bool
     {
-        return $this->setting('url') !== '' && $this->setting('store_id') !== '' && $this->setting('api_secret') !== '' && $this->setting('webhook_secret') !== '';
+        return $this->setting('url') !== '' && $this->setting('store_id') !== '' && $this->setting('api_secret') !== '' && $this->setting('webhook_secret') !== ''
+            && (! $this->payee || $this->payee->isConnected());
     }
 
     /** BTCPay has no sandbox; a testnet store is the owner's choice. */
@@ -108,7 +109,7 @@ class BTCPay extends Crypto
             return;
         }
 
-        $purchase = Purchase::query()->where('provider', 'btcpay')->where('provider_ref', (string) ($event['invoiceId'] ?? ''))->first();
+        $purchase = $this->ownPurchases()->where('provider_ref', (string) ($event['invoiceId'] ?? ''))->first();
 
         if ($purchase) {
             $this->confirm($purchase);
@@ -140,9 +141,8 @@ class BTCPay extends Crypto
             return false;
         }
 
-        $this->settings->set('ernestdefoe-kiosk.btcpay_url', rtrim($server, '/'));
-        $this->settings->set('ernestdefoe-kiosk.btcpay_store_id', $stores[0]);
-        $this->settings->set('ernestdefoe-kiosk.btcpay_api_secret', $apiKey);
+        $keep = ['url' => rtrim($server, '/'), 'store_id' => $stores[0], 'api_secret' => $apiKey, 'webhook_secret' => ''];
+        $this->keep($keep);
 
         foreach ($this->api('GET', '/webhooks') ?? [] as $hook) {
             if (is_array($hook) && rtrim((string) ($hook['url'] ?? ''), '/') === rtrim($webhookUrl, '/')) {
@@ -158,13 +158,28 @@ class BTCPay extends Crypto
         ]);
 
         if (! isset($made['id'], $made['secret'])) {
-            $this->settings->set('ernestdefoe-kiosk.btcpay_webhook_secret', '');
-
             return false;
         }
 
-        $this->settings->set('ernestdefoe-kiosk.btcpay_webhook_secret', (string) $made['secret']);
+        $this->keep(['webhook_secret' => (string) $made['secret']] + $keep);
 
         return true;
+    }
+
+    /** The forum's store goes in settings; a member's is sealed into their account. @param array<string, string> $values */
+    private function keep(array $values): void
+    {
+        if ($this->payee) {
+            $this->payee->setCredentials($values);
+            $this->payee->external_id = $values['store_id'];
+            $this->payee->status = $values['webhook_secret'] !== '' ? \Ernestdefoe\Kiosk\Seller\Account::CONNECTED : \Ernestdefoe\Kiosk\Seller\Account::PENDING;
+            $this->payee->save();
+
+            return;
+        }
+
+        foreach ($values as $key => $value) {
+            $this->settings->set('ernestdefoe-kiosk.btcpay_'.$key, $value);
+        }
     }
 }

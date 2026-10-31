@@ -25,11 +25,15 @@ class NOWPayments extends Crypto
 
     public function isReady(): bool
     {
-        return $this->setting('api_secret') !== '' && $this->setting('ipn_secret') !== '';
+        return $this->setting('api_secret') !== '' && $this->setting('ipn_secret') !== '' && (! $this->payee || $this->payee->isConnected());
     }
 
     public function mode(): string
     {
+        if ($this->payee) {
+            return $this->payee->mode === 'sandbox' ? 'sandbox' : 'live';
+        }
+
         return $this->settings->get('ernestdefoe-kiosk.nowpayments_sandbox') ? 'sandbox' : 'live';
     }
 
@@ -51,7 +55,7 @@ class NOWPayments extends Crypto
             'price_currency' => strtolower($purchase->currency),
             'order_id' => $purchase->number,
             'order_description' => mb_substr($purchase->product_name, 0, 200),
-            'ipn_callback_url' => resolve(\Flarum\Http\UrlGenerator::class)->to('api')->route('kiosk.webhooks', ['provider' => 'nowpayments']),
+            'ipn_callback_url' => $this->webhookUrl(),
             'success_url' => $returnUrl,
             'cancel_url' => $cancelUrl,
         ]);

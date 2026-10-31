@@ -108,7 +108,7 @@ class Sweeper
         $n = 0;
         foreach ($candidates as $purchase) {
             try {
-                $this->providers->get($purchase->provider)?->reconcile($purchase);
+                $this->providers->forPurchase($purchase)?->reconcile($purchase);
                 $n++;
             } catch (\Throwable $e) {
                 $this->log->warning('[kiosk] reconcile '.$purchase->number.' failed: '.$e->getMessage());

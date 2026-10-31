@@ -56,7 +56,8 @@ class ProductsController implements RequestHandlerInterface
             return new EmptyResponse(204);
         }
 
-        $products = Product::query()->with(['unlocks', 'prices'])->orderBy('position')->orderBy('id')->get();
+        // The forum's own products; members' listings have their own queue.
+        $products = Product::query()->whereNull('seller_id')->with(['unlocks', 'prices'])->orderBy('position')->orderBy('id')->get();
 
         return new JsonResponse(['data' => $this->presenter->products($products, $actor, true)]);
     }

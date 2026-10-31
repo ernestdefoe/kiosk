@@ -78,7 +78,7 @@ class PurchaseController implements RequestHandlerInterface
         }
 
         if (str_ends_with($route, '.confirm')) {
-            $provider = $this->providers->get($purchase->provider);
+            $provider = $this->providers->forPurchase($purchase);
             // Back from approving a plan switch: read the subscription again.
             if ($purchase->status === Purchase::PENDING) {
                 $provider?->confirm($purchase);
@@ -90,14 +90,14 @@ class PurchaseController implements RequestHandlerInterface
             if (! $purchase->isRecurring() || $purchase->status !== Purchase::ACTIVE || $purchase->provider === Purchase::GRANT) {
                 throw new ValidationException(['purchase' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.cannot_cancel')]);
             }
-            if (! $this->providers->get($purchase->provider)?->cancel($purchase)) {
+            if (! $this->providers->forPurchase($purchase)?->cancel($purchase)) {
                 throw new ValidationException(['purchase' => $this->translator->trans('ernestdefoe-kiosk.forum.errors.provider_unreachable')]);
             }
             $this->fulfilment->cancelAtPeriodEnd($purchase);
             $purchase->refresh();
         } elseif (str_ends_with($route, '.switch')) {
             $to = Price::query()->whereNull('archived_at')->where('product_id', $purchase->product_id)->find((int) ($this->body($request)['priceId'] ?? 0));
-            $provider = $this->providers->get($purchase->provider);
+            $provider = $this->providers->forPurchase($purchase);
 
             // 🚨 PayPal bills a new plan from the next cycle: more seats now
             // would be used before they're paid for. Stripe charges at once.

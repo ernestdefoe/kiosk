@@ -36,6 +36,8 @@ class Presenter
         $tagIds = $products->flatMap(fn (Product $p) => $p->unlocks->where('type', 'tag')->pluck('target_id'))->unique()->values()->all();
         $teasers = $tagIds ? resolve(\Illuminate\Database\ConnectionInterface::class)->table('kiosk_tag_groups')->whereIn('tag_id', $tagIds)->pluck('teaser', 'tag_id')->all() : [];
 
+        $ready = resolve(\Ernestdefoe\Kiosk\Seller\Sellers::class)->readyAccounts($products->pluck('seller_id')->filter()->map(fn ($v) => (int) $v)->unique()->values()->all());
+
         return $products->map(fn (Product $p) => [
             'id' => $p->id,
             'name' => $p->name,
@@ -55,6 +57,15 @@ class Presenter
             ])->values()->all(),
             'prices' => $p->prices->map(fn (Price $price) => $this->price($price))->values()->all(),
             'refusal' => $p->refusal($actor),
+            // A member's listing: who is paid, and how they can be paid.
+            'seller' => $p->seller_id && $p->seller ? [
+                'id' => (int) $p->seller->id,
+                'username' => $p->seller->username,
+                'displayName' => $p->seller->display_name,
+                'avatarUrl' => $p->seller->avatar_url,
+                'terms' => (string) $p->seller->getPreference('kioskSellerTerms', ''),
+            ] : null,
+            'providers' => $p->seller_id ? array_keys($ready[$p->seller_id] ?? []) : null,
         ] + ($admin ? [
             'active' => $p->is_active,
             'buyerGroupIds' => $p->buyerGroupIds(),

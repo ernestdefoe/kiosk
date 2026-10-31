@@ -31,11 +31,28 @@ class PayPalClient
      */
     public bool $rejected = false;
 
+    /** @var array<string, string>|null a member's own app (client_id, secret, webhook_id) instead of the forum's */
+    private ?array $own = null;
+
+    private ?string $ownMode = null;
+
     public function __construct(
         private Client $http,
         private SettingsRepositoryInterface $settings,
         private LoggerInterface $log,
     ) {
+    }
+
+    /** A copy that talks to a member's own PayPal app. @param array<string, string> $credentials */
+    public function forCredentials(array $credentials, string $mode): static
+    {
+        $copy = clone $this;
+        $copy->own = $credentials;
+        $copy->ownMode = $mode === 'live' ? 'live' : 'sandbox';
+        $copy->tokens = [];
+        $copy->rejected = false;
+
+        return $copy;
     }
 
     /** Whether PayPal answered our last token request with a refusal. */
@@ -46,11 +63,15 @@ class PayPalClient
 
     public function mode(): string
     {
-        return $this->settings->get(self::PREFIX.'mode') === 'live' ? 'live' : 'sandbox';
+        return $this->ownMode ?? ($this->settings->get(self::PREFIX.'mode') === 'live' ? 'live' : 'sandbox');
     }
 
     public function setting(string $key, ?string $mode = null): string
     {
+        if ($this->own !== null) {
+            return trim($this->own[$key] ?? '');
+        }
+
         return trim((string) $this->settings->get(self::PREFIX.($mode ?? $this->mode()).'_'.$key));
     }
 
@@ -273,7 +294,7 @@ class PayPalClient
      * Test the keys, then find this forum's webhook on the PayPal app or make
      * it, and save its id: two pasted fields and one click is the whole setup.
      *
-     * @return array{ok: bool, mode: string, step?: string, error?: string, created?: bool}
+     * @return array{ok: bool, mode: string, step?: string, error?: string, created?: bool, webhook_id?: string}
      */
     public function connect(string $webhookUrl, string $mode): array
     {
@@ -303,9 +324,9 @@ class PayPalClient
                 ]], null, $mode);
             }
 
-            $this->settings->set(self::PREFIX.$mode.'_webhook_id', (string) $hook['id']);
+            $this->keepWebhook($mode, (string) $hook['id']);
 
-            return ['ok' => true, 'mode' => $mode, 'created' => false];
+            return ['ok' => true, 'mode' => $mode, 'created' => false, 'webhook_id' => (string) $hook['id']];
         }
 
         $made = $this->call('POST', '/v1/notifications/webhooks', [
@@ -319,8 +340,18 @@ class PayPalClient
             return ['ok' => false, 'mode' => $mode, 'step' => 'webhook', 'error' => (string) ($made['details'][0]['description'] ?? $made['message'] ?? $made['name'] ?? '')];
         }
 
-        $this->settings->set(self::PREFIX.$mode.'_webhook_id', (string) $made['id']);
+        $this->keepWebhook($mode, (string) $made['id']);
 
-        return ['ok' => true, 'mode' => $mode, 'created' => true];
+        return ['ok' => true, 'mode' => $mode, 'created' => true, 'webhook_id' => (string) $made['id']];
+    }
+
+    /** The forum's webhook id goes in settings; a member's goes back to the caller, which seals it. */
+    private function keepWebhook(string $mode, string $id): void
+    {
+        if ($this->own === null) {
+            $this->settings->set(self::PREFIX.$mode.'_webhook_id', $id);
+        } else {
+            $this->own['webhook_id'] = $id;
+        }
     }
 }

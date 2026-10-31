@@ -82,7 +82,7 @@ class PurchasesController implements RequestHandlerInterface
 
     private function act(Purchase $purchase, string $action): void
     {
-        $provider = $purchase->provider === Purchase::GRANT ? null : $this->providers->get($purchase->provider);
+        $provider = $purchase->provider === Purchase::GRANT ? null : $this->providers->forPurchase($purchase);
 
         switch ($action) {
             case 'cancel':
@@ -100,26 +100,9 @@ class PurchasesController implements RequestHandlerInterface
                 break;
 
             case 'refund':
-                if (! $provider) {
-                    throw $this->error('nothing_to_refund');
+                if ($reason = resolve(\Ernestdefoe\Kiosk\Service\Refunds::class)->refund($purchase)) {
+                    throw $this->error($reason);
                 }
-                $payments = $purchase->payments()->where('status', Payment::COMPLETED)->get();
-                if ($payments->isEmpty()) {
-                    throw $this->error('nothing_to_refund');
-                }
-                // The latest payment: the period they are in now.
-                $payment = $payments->sortByDesc('id')->first();
-                if (! $provider->refund($payment)) {
-                    // Crypto can only be sent back from the gateway itself.
-                    throw $this->error($provider instanceof \Ernestdefoe\Kiosk\Provider\Crypto ? 'refund_crypto' : 'refund_failed');
-                }
-                $payment->status = Payment::REFUNDED;
-                $payment->refunded_cents = $payment->amount_cents;
-                $payment->save();
-                if ($purchase->isRecurring()) {
-                    $provider->cancel($purchase);
-                }
-                $this->fulfilment->end($purchase, Purchase::REFUNDED);
                 break;
         }
     }

@@ -2,6 +2,10 @@
 
 namespace Ernestdefoe\Kiosk\Provider;
 
+use Ernestdefoe\Kiosk\Seller\Account;
+use Ernestdefoe\Kiosk\Seller\PaysTo;
+use Ernestdefoe\Kiosk\Seller\SellerProvider;
+
 use Carbon\Carbon;
 use Ernestdefoe\Kiosk\Model\Payment;
 use Ernestdefoe\Kiosk\Model\Price;
@@ -23,8 +27,10 @@ use Psr\Log\LoggerInterface;
  * 🚨 As with the card providers: the return page is never believed, the
  * gateway is asked again before access opens, and amounts are compared.
  */
-abstract class Crypto implements Provider, WebhookProvider
+abstract class Crypto implements Provider, WebhookProvider, SellerProvider
 {
+    use PaysTo;
+
     public function __construct(
         protected Client $http,
         protected SettingsRepositoryInterface $settings,
@@ -36,7 +42,30 @@ abstract class Crypto implements Provider, WebhookProvider
 
     protected function setting(string $key): string
     {
+        if ($this->payee) {
+            return trim($this->payee->credentials()[$key] ?? '');
+        }
+
         return trim((string) $this->settings->get('ernestdefoe-kiosk.'.$this->key().'_'.$key));
+    }
+
+    /** A copy that is paid into a member's own store or account. */
+    public function forAccount(Account $account): static
+    {
+        $copy = clone $this;
+        $copy->payee = $account;
+
+        return $copy;
+    }
+
+    /** Where this payee's provider sends its notifications. */
+    protected function webhookUrl(): string
+    {
+        $url = resolve(\Flarum\Http\UrlGenerator::class)->to('api');
+
+        return $this->payee
+            ? $url->route('kiosk.webhooks.seller', ['provider' => $this->key(), 'account' => $this->payee->id])
+            : $url->route('kiosk.webhooks', ['provider' => $this->key()]);
     }
 
     public function supports(Price $price): bool
@@ -139,6 +168,6 @@ abstract class Crypto implements Provider, WebhookProvider
 
     protected function byNumber(mixed $number): ?Purchase
     {
-        return is_string($number) && $number !== '' ? Purchase::query()->where('number', $number)->where('provider', $this->key())->first() : null;
+        return is_string($number) && $number !== '' ? $this->ownPurchases()->where('number', $number)->first() : null;
     }
 }

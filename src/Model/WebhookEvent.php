@@ -14,6 +14,7 @@ use Flarum\Database\AbstractModel;
  * @property Carbon $received_at
  * @property Carbon|null $processed_at
  * @property string|null $error
+ * @property int|null $account_id
  */
 class WebhookEvent extends AbstractModel
 {
