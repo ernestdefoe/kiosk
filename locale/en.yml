@@ -189,7 +189,8 @@ ernestdefoe-kiosk:
         btcpay_url: "Enter your BTCPay Server's https:// address."
         nowpayments_keys: Paste your NOWPayments API key and IPN secret.
         nowpayments_rejected: NOWPayments didn't accept that API key.
-        not_yours: You can only sell things you made yourself.
+        not_yours: You can only sell things you made yourself, and each listing needs at least one.
+        has_subscriptions: Buyers still have subscriptions running through this account. Keep it until they end, or cancel them from your sales.
         too_many_listings: You've reached the most listings one member can have.
     purchases:
       title: My purchases

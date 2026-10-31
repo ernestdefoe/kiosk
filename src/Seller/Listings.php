@@ -36,6 +36,11 @@ class Listings
             throw $this->invalid('name', 'too_many_listings');
         }
 
+        // A new listing must sell something of theirs.
+        if ($product === null && empty($data['unlocks'])) {
+            throw $this->invalid('unlocks', 'not_yours');
+        }
+
         // What a member may set. Everything else (buyer groups, stock, dates,
         // hidden, slug) is the forum's.
         $allowed = Arr::only($data, ['name', 'description', 'benefits', 'icon', 'color', 'active', 'unlocks', 'prices']);
@@ -55,7 +60,7 @@ class Listings
         $onlyToggled = $product !== null && array_keys($allowed) === ['active'];
         $trusted = $seller->hasPermission(Sellers::TRUSTED);
         // Items become sellable (a Depot file locked to buyers) only once a moderator approves.
-        $saved = $this->saver->save($product, $allowed, $trusted);
+        $saved = $this->saver->save($product, $allowed, false);
 
         $saved->seller_id = $seller->id;
         if (! $onlyToggled || $saved->review === Product::REJECTED) {
@@ -63,6 +68,9 @@ class Listings
             $saved->review_note = null;
         }
         $saved->save();
+
+        // On sale: its items are locked to buyers. Off sale or waiting: given back.
+        $saved->is_active && $saved->review === null ? $this->approved($saved) : $this->released($saved);
 
         return $saved;
     }

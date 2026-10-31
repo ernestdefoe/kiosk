@@ -119,8 +119,8 @@ class SellingController implements RequestHandlerInterface
                 break;
 
             case 'kiosk.selling.listings.delete':
-                $product = Product::query()->where('seller_id', $actor->id)->findOrFail($this->routeId($request));
-                $this->listings->released($product);
+                $product = Product::query()->where('seller_id', $actor->id)->with('unlocks')->findOrFail($this->routeId($request));
+                $unlocks = $product->unlocks;
                 // A listing anyone bought is switched off, not deleted: their receipts point at it.
                 if (Purchase::query()->where('product_id', $product->id)->exists()) {
                     $product->is_active = false;
@@ -128,6 +128,9 @@ class SellingController implements RequestHandlerInterface
                 } else {
                     $product->delete();
                 }
+                // Then its items are given back (nothing sells them now).
+                $product->setRelation('unlocks', $unlocks);
+                $this->listings->released($product);
                 break;
 
             case 'kiosk.selling.sales.refund':
