@@ -33,6 +33,8 @@ export interface Product {
   icon: string | null;
   color: string | null;
   hidden: boolean;
+  /** A member can't buy it again while they hold it. */
+  onePerMember: boolean;
   unlocks: Unlock[];
   prices: Price[];
   /** Why the viewer cannot buy it now, or null. */
@@ -117,6 +119,8 @@ export interface Person {
 
 export interface StoreMeta {
   owned: number[];
+  /** product id => the order number of a bank transfer on the way for it */
+  pending?: Record<string, string>;
   providers: { key: string; mode: string; recurring: boolean }[];
   termsUrl: string | null;
 }

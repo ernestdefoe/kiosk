@@ -50,7 +50,8 @@ export default class ProductCard extends Component<ProductCardAttrs> {
   view() {
     const { product, highlight } = this.attrs;
     const meta = this.meta();
-    const owned = meta.owned.includes(product.id) && !product.prices.some((p) => p.kind === 'custom');
+    // Only a one-per-member product is "yours": credits and tips can always be bought again.
+    const owned = product.onePerMember && (meta.owned.includes(product.id) || !!meta.pending?.[product.id]);
     const style = product.color ? { '--kiosk-accent': product.color } : undefined;
 
     return (
@@ -261,16 +262,35 @@ export default class ProductCard extends Component<ProductCardAttrs> {
     );
   }
 
+  /** In place of Buy: their bank transfer on the way, or what they own (opening what it unlocks, when that is one place). */
+  held(product: Product, meta: StoreMeta): Mithril.Children {
+    const pending = meta.pending?.[product.id];
+    if (pending && !meta.owned.includes(product.id)) {
+      return (
+        <LinkButton className="Button KioskCard-button" icon="fas fa-building-columns" href={app.route('kiosk.return', { number: pending })}>
+          {t('forum.card.pending')}
+        </LinkButton>
+      );
+    }
+
+    const links = product.unlocks.filter((u) => u.url);
+    return (
+      <LinkButton
+        className="Button KioskCard-button"
+        icon="fas fa-circle-check"
+        href={links.length === 1 ? links[0].url! : app.route('kiosk.purchases')}
+      >
+        {t('forum.card.owned')}
+      </LinkButton>
+    );
+  }
+
   action(owned: boolean): Mithril.Children {
     const { product } = this.attrs;
     const meta = this.meta();
 
     if (owned && !(this.extra === 'gift' && this.giftTo.trim())) {
-      return (
-        <LinkButton className="Button KioskCard-button" icon="fas fa-circle-check" href={app.route('kiosk.purchases')}>
-          {t('forum.card.owned')}
-        </LinkButton>
-      );
+      return this.held(product, meta);
     }
 
     if (product.refusal && product.refusal !== 'login') {

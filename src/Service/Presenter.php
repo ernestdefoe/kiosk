@@ -52,6 +52,7 @@ class Presenter
             'icon' => $p->icon,
             'color' => $p->color,
             'hidden' => $p->is_hidden,
+            'onePerMember' => $p->one_per_member,
             'unlocks' => $p->unlocks->map(fn ($u) => [
                 'type' => $u->type,
                 'targetId' => $u->target_id,

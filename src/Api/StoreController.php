@@ -77,6 +77,14 @@ class StoreController implements RequestHandlerInterface
                     ->map(fn ($id) => (int) $id)
                     ->values()
                     ->all(),
+                // Bank transfers on the way for a product (its order number), so
+                // the card says "Payment pending" and links to how to pay.
+                'pending' => $actor->isGuest() ? (object) [] : (object) Purchase::query()
+                    ->where('user_id', $actor->id)->whereNull('gifted_by')
+                    ->where('status', Purchase::AWAITING)
+                    ->whereNotNull('product_id')
+                    ->pluck('number', 'product_id')
+                    ->all(),
                 // `recurring`: whether it can take a subscription (crypto can't).
                 'providers' => array_map(fn ($p) => ['key' => $p->key(), 'mode' => $p->mode(), 'recurring' => $p->supports(Price::monthly())], $this->providers->ready()),
                 'termsUrl' => $this->settings->get('ernestdefoe-kiosk.terms_url') ?: null,

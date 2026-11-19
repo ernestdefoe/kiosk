@@ -28,6 +28,7 @@ class Checkout
         private Cache $cache,
         private UrlGenerator $url,
         private TranslatorInterface $translator,
+        private Locks $locks,
     ) {
     }
 
@@ -43,6 +44,18 @@ class Checkout
     {
         $actor->assertRegistered();
 
+        // 🚨 What is checked below counts what this checkout adds (one per
+        // member, checkouts in ten minutes, a coupon used once): one checkout
+        // per member at a time, so two fast clicks can't both get through.
+        return $this->locks->exclusive('checkout.'.$actor->id, fn () => $this->startLocked($actor, $priceId, $providerKey, $options));
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     * @return array{url: string, number: string}
+     */
+    private function startLocked(User $actor, int $priceId, string $providerKey, array $options): array
+    {
         // Flarum treats an unconfirmed account as a guest, so what they bought
         // would not open until they confirmed: ask first, not after paying.
         if (! $actor->is_email_confirmed) {
@@ -70,6 +83,11 @@ class Checkout
 
         if ($refusal = $product->refusal($recipient)) {
             throw $this->error($refusal);
+        }
+
+        // One per member: not again while they hold it, or have a bank transfer for it on the way.
+        if ($product->one_per_member && ($held = $product->heldBy($recipient))) {
+            throw $this->error($recipient === $actor ? ($held === 'pending' ? 'payment_pending' : 'already_owned') : 'gift_already_owned');
         }
 
         $provider = $this->providers->get($providerKey);

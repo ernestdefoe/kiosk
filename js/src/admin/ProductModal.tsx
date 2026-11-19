@@ -51,6 +51,8 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
   color = '';
   active = true;
   hidden = false;
+  /** null on a new product until the admin chooses: the server decides from what it sells. */
+  onePerMember: boolean | null = null;
   stock = '';
   buyerGroupIds: number[] = [];
   unlocks: UnlockRow[] = [];
@@ -75,6 +77,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
     this.color = p?.color ?? '';
     this.active = p?.active ?? true;
     this.hidden = p?.hidden ?? false;
+    this.onePerMember = p ? p.onePerMember : null;
     this.stock = p?.stock != null ? String(p.stock) : '';
     this.buyerGroupIds = p?.buyerGroupIds ?? [];
     this.unlocks = p
@@ -116,6 +119,11 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
 
   title() {
     return this.attrs.product ? t('admin.product.edit_title') : t('admin.product.new_title');
+  }
+
+  /** What the server picks for a new product (Product::onePerMemberByDefault): off for credits, bumps, tips and pay-what-you-want. */
+  onePerMemberByDefault(): boolean {
+    return !this.unlocks.some((u) => ['post', 'bump', 'tip'].includes(u.type)) && !this.prices.some((p) => p.kind === 'custom');
   }
 
   content() {
@@ -229,6 +237,10 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
               {t('admin.product.hidden')}
             </Switch>
             <div className="helpText">{t('admin.product.hidden_help')}</div>
+            <Switch state={this.onePerMember ?? this.onePerMemberByDefault()} onchange={(v: boolean) => (this.onePerMember = v)}>
+              {t('admin.product.one_per_member')}
+            </Switch>
+            <div className="helpText">{t('admin.product.one_per_member_help')}</div>
             <div className="Form-group">
               <label>{t('admin.product.stock')}</label>
               <input
@@ -483,6 +495,7 @@ export default class ProductModal extends FormModal<ProductModalAttrs> {
         color: this.color,
         active: this.active,
         hidden: this.hidden,
+        ...(this.onePerMember === null ? {} : { onePerMember: this.onePerMember }),
         stock: this.stock === '' ? null : Number(this.stock),
         buyerGroupIds: this.buyerGroupIds,
         unlocks: this.unlocks.map((x) => ({ type: x.type, targetId: x.targetId, ...(x.type === 'tag' ? { teaser: x.teaser !== false } : {}) })),

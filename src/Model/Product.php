@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $color
  * @property bool $is_active
  * @property bool $is_hidden
+ * @property bool $one_per_member
  * @property string|null $buyer_group_ids
  * @property int|null $stock
  * @property int $sold_count
@@ -40,6 +41,7 @@ class Product extends AbstractModel
     protected $casts = [
         'is_active' => 'bool',
         'is_hidden' => 'bool',
+        'one_per_member' => 'bool',
         'stock' => 'int',
         'sold_count' => 'int',
         'reserved_count' => 'int',
@@ -83,6 +85,41 @@ class Product extends AbstractModel
     public function benefitLines(): array
     {
         return array_values(array_filter(array_map('trim', preg_split('/\R/', (string) $this->benefits) ?: [])));
+    }
+
+    /** Unlock types that are used up, so buying again is normal: posting credits, bumps, tips. */
+    public const CONSUMABLE_TYPES = ['post', 'bump', 'tip'];
+
+    /**
+     * Whether a product with these unlocks and prices is "one per member" by
+     * default: on when it only sells access, off for consumables and
+     * pay-what-you-want prices. The admin can change it either way.
+     *
+     * @param list<string> $unlockTypes
+     * @param list<string> $priceKinds
+     */
+    public static function onePerMemberByDefault(array $unlockTypes, array $priceKinds): bool
+    {
+        return ! array_intersect($unlockTypes, self::CONSUMABLE_TYPES) && ! in_array(Price::CUSTOM, $priceKinds, true);
+    }
+
+    /**
+     * What this member already has of it: 'owned' (a live purchase: paid and
+     * not ended, a one-time price forever), 'pending' (a bank transfer waiting
+     * to be confirmed), or null. An unfinished card or PayPal checkout doesn't
+     * count, so closing the payment tab never locks a member out. Nor does a
+     * cancelled subscription still running to its end: subscribing again is
+     * how a member changes their mind (one live subscription is checked apart).
+     */
+    public function heldBy(User $user): ?string
+    {
+        $held = Purchase::query()->where('user_id', $user->id)->where('product_id', $this->id)
+            ->where(fn ($q) => $q->where('status', Purchase::AWAITING)
+                ->orWhere(fn ($live) => $live->where('status', Purchase::ACTIVE)
+                    ->where(fn ($p) => $p->whereNull('period_end')->orWhere('period_end', '>', Carbon::now()))))
+            ->pluck('status')->all();
+
+        return $held === [] ? null : (in_array(Purchase::AWAITING, $held, true) && count(array_unique($held)) === 1 ? 'pending' : 'owned');
     }
 
     /**

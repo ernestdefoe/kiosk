@@ -65,6 +65,10 @@ class ProductSaver
             $product->color = $this->color(Arr::get($data, 'color', $product->color));
             $product->is_active = (bool) Arr::get($data, 'active', $isNew ? true : $product->is_active);
             $product->is_hidden = (bool) Arr::get($data, 'hidden', $isNew ? false : $product->is_hidden);
+            // One per member: the admin's choice, else for a new product what it sells decides.
+            $product->one_per_member = Arr::has($data, 'onePerMember')
+                ? (bool) Arr::get($data, 'onePerMember')
+                : ($isNew ? Product::onePerMemberByDefault(array_column($unlocks ?? [], 0), array_column($prices ?? [], 'kind')) : $product->one_per_member);
             $groups = array_values(array_unique(array_filter(array_map('intval', (array) Arr::get($data, 'buyerGroupIds', $product->buyerGroupIds())))));
             $product->buyer_group_ids = $groups ? json_encode($groups) : null;
             $stock = Arr::get($data, 'stock', $product->stock);

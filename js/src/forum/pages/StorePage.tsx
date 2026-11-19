@@ -14,7 +14,7 @@ import ProductCard from '../components/ProductCard';
 /** /store — everything for sale, grouped by what it opens. */
 export default class StorePage extends Page {
   products: Product[] = [];
-  meta: StoreMeta = { owned: [], providers: [], termsUrl: null };
+  meta: StoreMeta = { owned: [], pending: {}, providers: [], termsUrl: null };
   loading = true;
 
   oninit(vnode: Mithril.Vnode) {

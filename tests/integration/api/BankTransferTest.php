@@ -207,7 +207,8 @@ class BankTransferTest extends KioskTestCase
         $monthly = $this->product([['type' => 'group', 'targetId' => self::GOLD]], [['kind' => 'recurring', 'interval' => 'month', 'amount' => '5', 'currency' => 'EUR']]);
         $this->assertSame(422, $this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $monthly['prices'][0]['id'], 'provider' => 'bank'])->getStatusCode());
 
-        $product = $this->gold();
+        // Not one per member here: three orders of the same thing, to reach the limit.
+        $product = $this->gold([], ['onePerMember' => false]);
         for ($i = 0; $i < 3; $i++) {
             $this->order($product);
         }
