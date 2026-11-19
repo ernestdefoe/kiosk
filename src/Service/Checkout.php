@@ -183,7 +183,7 @@ class Checkout
             // 🚨 The buyer's browser goes wherever this says. A member's own
             // server (their BTCPay) chooses it, so: https only, and for BTCPay
             // only on the server they connected. Never javascript: or data:.
-            if (! self::safeLink($link, $account)) {
+            if (! self::safeLink($link, $account) && ! $this->isOwnPage($link)) {
                 throw $this->error('provider_unavailable');
             }
         } catch (\Throwable $e) {
@@ -195,6 +195,12 @@ class Checkout
         }
 
         return ['url' => $link, 'number' => $purchase->number];
+    }
+
+    /** The forum's own order page (a bank transfer's next step), on whatever scheme the forum runs. */
+    private function isOwnPage(string $link): bool
+    {
+        return str_starts_with($link, rtrim($this->url->to('forum')->base(), '/').'/') && ! preg_match('/[\x00-\x20]/', $link);
     }
 
     /** Where the buyer may be sent: https, and for a member's BTCPay only their own server. */

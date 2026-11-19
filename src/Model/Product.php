@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $buyer_group_ids
  * @property int|null $stock
  * @property int $sold_count
+ * @property int $reserved_count held for bank transfers not yet paid
  * @property Carbon|null $available_from
  * @property Carbon|null $available_until
  * @property int $position
@@ -41,6 +42,7 @@ class Product extends AbstractModel
         'is_hidden' => 'bool',
         'stock' => 'int',
         'sold_count' => 'int',
+        'reserved_count' => 'int',
         'position' => 'int',
         'available_from' => 'datetime',
         'available_until' => 'datetime',
@@ -102,7 +104,7 @@ class Product extends AbstractModel
         if ($this->available_until && $this->available_until->isBefore($now)) {
             return 'unavailable';
         }
-        if ($this->stock !== null && $this->sold_count >= $this->stock) {
+        if ($this->stock !== null && $this->sold_count + $this->reserved_count >= $this->stock) {
             return 'sold_out';
         }
         if ($actor->isGuest()) {

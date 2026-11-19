@@ -10,9 +10,9 @@ import classList from 'flarum/common/utils/classList';
 import extractText from 'flarum/common/utils/extractText';
 import type Mithril from 'mithril';
 import { t } from '../../common/t';
-import { money, priceLabel } from '../../common/money';
-import { goTo, selling } from '../../common/api';
-import type { Listing, Sale, Selling, SellerProviderStatus } from '../../common/api';
+import { date, money, priceLabel } from '../../common/money';
+import { goTo, selling, transfers } from '../../common/api';
+import type { AwaitingSale, Listing, Sale, Selling, SellerProviderStatus } from '../../common/api';
 
 /** The fields each provider asks a member for. Stripe and BTCPay send them to the provider's own page instead. */
 const FIELDS: Record<string, string[]> = {
@@ -21,8 +21,13 @@ const FIELDS: Record<string, string[]> = {
   paypalApp: ['clientId', 'secret'],
   btcpay: ['url'],
   nowpayments: ['apiKey', 'ipnSecret'],
+  bank: ['details', 'instructions'],
   stripe: [],
 };
+
+/** Fields that may be left empty, and fields that take several lines. */
+const OPTIONAL = ['instructions'];
+const MULTILINE = ['details', 'instructions'];
 
 /**
  * /store/selling — a member's own shop: where they're paid, what they sell,
@@ -152,6 +157,14 @@ export default class SellingPage extends Page {
         )}
       </section>,
 
+      data.awaiting.length ? (
+        <section className="KioskSelling-section KioskSelling-awaiting">
+          <h3>{t('forum.selling.awaiting')}</h3>
+          <p className="helpText">{t('forum.selling.awaiting_help')}</p>
+          <ul className="KioskPurchases">{data.awaiting.map((a) => this.awaiting(a))}</ul>
+        </section>
+      ) : null,
+
       <section className="KioskSelling-section">
         <h3>{t('forum.selling.sales')}</h3>
         {data.sales.length ? (
@@ -187,17 +200,29 @@ export default class SellingPage extends Page {
 
         {p.status === 'connected' ? null : (
           <div className="KioskSelling-fields">
-            {fields.map((f) => (
-              <input
-                className="FormControl"
-                type={f === 'url' ? 'url' : f === 'email' ? 'email' : f === 'clientId' ? 'text' : 'password'}
-                autocomplete="off"
-                placeholder={extractText(t('forum.selling.field.' + f))}
-                aria-label={extractText(t('forum.selling.field.' + f))}
-                value={values[f] || ''}
-                oninput={(e: InputEvent) => (values[f] = (e.target as HTMLInputElement).value)}
-              />
-            ))}
+            {fields.map((f) =>
+              MULTILINE.includes(f) ? (
+                <textarea
+                  className="FormControl"
+                  rows={f === 'details' ? 4 : 2}
+                  maxlength={1000}
+                  placeholder={extractText(t('forum.selling.field.' + f))}
+                  aria-label={extractText(t('forum.selling.field.' + f))}
+                  value={values[f] || ''}
+                  oninput={(e: InputEvent) => (values[f] = (e.target as HTMLTextAreaElement).value)}
+                />
+              ) : (
+                <input
+                  className="FormControl"
+                  type={f === 'url' ? 'url' : f === 'email' ? 'email' : f === 'clientId' ? 'text' : 'password'}
+                  autocomplete="off"
+                  placeholder={extractText(t('forum.selling.field.' + f))}
+                  aria-label={extractText(t('forum.selling.field.' + f))}
+                  value={values[f] || ''}
+                  oninput={(e: InputEvent) => (values[f] = (e.target as HTMLInputElement).value)}
+                />
+              )
+            )}
           </div>
         )}
 
@@ -212,7 +237,7 @@ export default class SellingPage extends Page {
             <Button
               className="Button Button--primary"
               loading={this.busy === p.key}
-              disabled={fields.some((f) => !(values[f] || '').trim())}
+              disabled={fields.some((f) => !OPTIONAL.includes(f) && !(values[f] || '').trim())}
               onclick={() => this.load(selling.connect(p.key, values), p.key)}
             >
               {t(p.key === 'stripe' || p.key === 'btcpay' ? 'forum.selling.continue_to' : 'forum.selling.connect', {
@@ -284,7 +309,7 @@ export default class SellingPage extends Page {
       <li className={classList('KioskPurchase', { 'KioskPurchase--live': s.status === 'active' })}>
         <div className="KioskPurchase-main">
           <h4 className="KioskPurchase-name">{s.productName}</h4>
-          <span className={classList('KioskStatus', 'KioskStatus--' + s.status)}>{t('forum.purchases.status.' + s.status)}</span>
+          <span className={classList('KioskStatus', 'KioskStatus--' + s.status)}>{t('lib.status.' + s.status)}</span>
         </div>
         <p className="KioskPurchase-terms">
           {money(s.amountCents, s.currency)}
@@ -305,6 +330,72 @@ export default class SellingPage extends Page {
           </div>
         ) : null}
       </li>
+    );
+  }
+
+  /** A buyer's bank transfer on its way: Mark paid once it's in, or Cancel. */
+  awaiting(a: AwaitingSale): Mithril.Children {
+    const amount = money(a.amountCents, a.currency);
+
+    return (
+      <li className="KioskPurchase">
+        <div className="KioskPurchase-main">
+          <h4 className="KioskPurchase-name">{a.productName}</h4>
+          <span className="KioskStatus KioskStatus--awaiting">{t('lib.status.awaiting')}</span>
+        </div>
+        <p className="KioskPurchase-terms">
+          {amount}
+          {' · '}
+          {a.buyer ? <a href={app.route('user', { username: a.buyer.username })}>{a.buyer.displayName}</a> : t('forum.selling.deleted_buyer')}
+          {' · '}
+          {humanTime(new Date(a.createdAt))}
+        </p>
+        <p className="KioskPurchase-terms">
+          {t('forum.selling.reference', { reference: <code>{a.reference}</code> })}
+          {a.expiresAt ? [' · ', t('forum.selling.expires', { date: date(a.expiresAt) })] : null}
+        </p>
+        {a.proof ? (
+          <p className="KioskPurchase-terms">
+            {t('forum.selling.proof')}
+            {': '}
+            {a.proof.note ? <q>{a.proof.note}</q> : null}{' '}
+            {a.proof.file ? (
+              <a href={transfers.proofUrl(a.number)} target="_blank" rel="noopener">
+                {t('forum.selling.proof_file')}
+              </a>
+            ) : null}
+          </p>
+        ) : null}
+        <div className="KioskSelling-actions">
+          <Button
+            className="Button Button--primary"
+            icon="fas fa-check"
+            loading={this.busy === a.number + 'paid'}
+            onclick={() => this.settleTransfer(a, 'paid', t('forum.selling.mark_paid_confirm', { amount, reference: a.reference }))}
+          >
+            {t('forum.selling.mark_paid')}
+          </Button>
+          <Button
+            className="Button Button--link"
+            loading={this.busy === a.number + 'cancel'}
+            onclick={() => this.settleTransfer(a, 'cancel', t('forum.selling.cancel_order_confirm'))}
+          >
+            {t('forum.selling.cancel_order')}
+          </Button>
+        </div>
+      </li>
+    );
+  }
+
+  settleTransfer(a: AwaitingSale, action: 'paid' | 'cancel', question: Mithril.Children) {
+    if (!confirm(extractText(question))) return;
+    this.busy = a.number + action;
+    transfers[action](a.number).then(
+      () => this.load(selling.get()),
+      () => {
+        this.busy = null;
+        m.redraw();
+      }
     );
   }
 

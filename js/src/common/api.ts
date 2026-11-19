@@ -72,8 +72,10 @@ export interface Purchase {
   termDays: number | null;
   provider: string;
   mode: string | null;
-  status: 'pending' | 'active' | 'canceled' | 'ended' | 'expired' | 'refunded';
+  status: 'pending' | 'active' | 'canceled' | 'ended' | 'expired' | 'refunded' | 'awaiting';
   live: boolean;
+  /** Waiting for a bank transfer: how to pay (the payer only), the reference and any proof sent. */
+  transfer: Transfer | null;
   periodStart: string | null;
   periodEnd: string | null;
   cancelAtPeriodEnd: boolean;
@@ -96,6 +98,15 @@ export interface Purchase {
   note?: string | null;
   providerRef?: string | null;
   user?: { id: number; username: string; displayName: string; avatarUrl: string | null; email: string } | null;
+}
+
+export interface Transfer {
+  reference: string;
+  expiresAt: string | null;
+  proof: { file: 'image' | 'pdf' | null; note: string | null; at: string } | null;
+  /** The account to pay into, and what the payee asks: the payer only. */
+  details?: string;
+  instructions?: string;
 }
 
 export interface Person {
@@ -172,7 +183,17 @@ export interface Sale {
   refundable: boolean;
 }
 
+export interface AwaitingSale extends Transfer {
+  number: string;
+  productName: string;
+  amountCents: number;
+  currency: string;
+  createdAt: string;
+  buyer: { username: string; displayName: string } | null;
+}
+
 export interface Selling {
+  awaiting: AwaitingSale[];
   trusted: boolean;
   feePercent: number;
   terms: string;
@@ -201,12 +222,27 @@ export const selling = {
   refund: (number: string) => call<SellingReply>('POST', `/selling/sales/${number}/refund`),
 };
 
+/** Bank transfers: the payer's proof and cancel, and the admin's or seller's Mark paid. */
+export const transfers = {
+  paid: (number: string) => call<void>('POST', `/transfers/${number}/paid`),
+  cancel: (number: string) => call<{ data: Purchase } | void>('POST', `/transfers/${number}/cancel`),
+  proof: (number: string, file: File | null, note: string) => {
+    const body = new FormData();
+    if (file) body.append('proof', file);
+    body.append('note', note);
+    return app.request<{ data: Purchase }>({ method: 'POST', url: url(`/transfers/${number}/proof`), body, serialize: (raw: FormData) => raw });
+  },
+  proofUrl: (number: string) => url(`/transfers/${number}/proof`),
+};
+
 /**
  * Send the browser to a provider's page. 🚨 Only https: a member's own
  * payment server picks some of these addresses, and javascript: or data:
  * would run on the forum's origin.
  */
 export function goTo(url: string | null | undefined): void {
-  if (url && /^https:\/\/[^\s]+$/i.test(url)) window.location.href = url;
+  // The forum's own order page (a bank transfer) is fine on any scheme the forum runs.
+  const own = app.forum.attribute<string>('baseUrl') + '/';
+  if (url && !/\s/.test(url) && (/^https:\/\//i.test(url) || url.startsWith(own))) window.location.href = url;
   else app.alerts.show({ type: 'error' }, app.translator.trans('ernestdefoe-kiosk.forum.errors.provider_unavailable'));
 }

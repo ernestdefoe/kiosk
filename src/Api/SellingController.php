@@ -91,6 +91,8 @@ class SellingController implements RequestHandlerInterface
                     $this->connect->paypal($actor, trim((string) ($body['clientId'] ?? '')), trim((string) ($body['secret'] ?? '')));
                 } elseif ($provider === 'nowpayments') {
                     $this->connect->nowpayments($actor, trim((string) ($body['apiKey'] ?? '')), trim((string) ($body['ipnSecret'] ?? '')));
+                } elseif ($provider === 'bank') {
+                    $this->connect->bank($actor, (string) ($body['details'] ?? ''), (string) ($body['instructions'] ?? ''));
                 } elseif ($provider === 'stripe') {
                     $url = $this->connect->stripe($actor);
                 } elseif ($provider === 'btcpay') {
@@ -162,11 +164,14 @@ class SellingController implements RequestHandlerInterface
         $ready = $this->sellers->readyAccounts([(int) $actor->id])[(int) $actor->id] ?? [];
 
         $listings = Product::query()->where('seller_id', $actor->id)->with(['unlocks', 'prices', 'seller'])->orderByDesc('id')->get();
-        $sold = Purchase::query()->where('seller_id', $actor->id)->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED])
+        $sold = Purchase::query()->where('seller_id', $actor->id)->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED, Purchase::AWAITING])
             ->selectRaw('product_id, count(*) as n')->groupBy('product_id')->pluck('n', 'product_id');
 
-        $sales = Purchase::query()->where('seller_id', $actor->id)->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED])
+        $sales = Purchase::query()->where('seller_id', $actor->id)->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED, Purchase::AWAITING])
             ->with(['payments', 'user'])->orderByDesc('id')->limit(self::SALES)->get();
+        // Bank transfers buyers are sending them: theirs to mark paid or cancel.
+        $awaiting = Purchase::query()->where('seller_id', $actor->id)->where('status', Purchase::AWAITING)
+            ->with('user')->orderBy('id')->limit(self::SALES)->get();
 
         return [
             'trusted' => $actor->hasPermission(Sellers::TRUSTED),
@@ -185,6 +190,14 @@ class SellingController implements RequestHandlerInterface
                 'active' => $model->is_active,
                 'sold' => (int) ($sold[$model->id] ?? 0),
             ], $this->presenter->products($listings, $actor), $listings->all()),
+            'awaiting' => $awaiting->map(fn (Purchase $p) => [
+                'number' => $p->number,
+                'productName' => $p->product_name,
+                'amountCents' => $p->amount_cents,
+                'currency' => $p->currency,
+                'createdAt' => $p->created_at?->toIso8601String(),
+                'buyer' => $p->user ? ['username' => $p->user->username, 'displayName' => $p->user->display_name] : null,
+            ] + $this->presenter->transfer($p, false))->values()->all(),
             'sales' => $sales->map(fn (Purchase $p) => [
                 'number' => $p->number,
                 'productName' => $p->product_name,

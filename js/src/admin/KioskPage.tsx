@@ -18,11 +18,12 @@ import CouponsTab from './CouponsTab';
 import SellersTab from './SellersTab';
 import AdsTab from './AdsTab';
 import CryptoCards from './CryptoCards';
+import TransfersTab from './TransfersTab';
 import Sortable from './sortable';
 import { TEMPLATES } from './templates';
 
-type Tab = 'overview' | 'products' | 'purchases' | 'coupons' | 'ads' | 'payments' | 'sellers' | 'webhooks' | 'settings';
-const TABS: Tab[] = ['overview', 'products', 'purchases', 'coupons', 'ads', 'payments', 'sellers', 'webhooks', 'settings'];
+type Tab = 'overview' | 'products' | 'purchases' | 'transfers' | 'coupons' | 'ads' | 'payments' | 'sellers' | 'webhooks' | 'settings';
+const TABS: Tab[] = ['overview', 'products', 'purchases', 'transfers', 'coupons', 'ads', 'payments', 'sellers', 'webhooks', 'settings'];
 
 const PAYPAL_APPS = 'https://developer.paypal.com/dashboard/applications';
 const STRIPE_KEYS = 'https://dashboard.stripe.com/apikeys';
@@ -111,7 +112,7 @@ export default class KioskPage extends ExtensionPage {
       <div className="KioskAdmin">
         <div className="container">
           <nav className="KioskTabs" role="tablist">
-            {TABS.map((tab) => (
+            {TABS.filter((tab) => tab !== 'transfers' || this.bankInUse()).map((tab) => (
               <Button
                 className={classList('Button Button--flat', { active: this.tab === tab })}
                 role="tab"
@@ -124,6 +125,9 @@ export default class KioskPage extends ExtensionPage {
                 {t('admin.tabs.' + tab)}
                 {tab === 'webhooks' && this.overview?.stats.failedWebhooks ? (
                   <span className="KioskBadge">{this.overview.stats.failedWebhooks}</span>
+                ) : null}
+                {tab === 'transfers' && this.overview?.stats.awaitingTransfers ? (
+                  <span className="KioskBadge">{this.overview.stats.awaitingTransfers}</span>
                 ) : null}
               </Button>
             ))}
@@ -140,6 +144,8 @@ export default class KioskPage extends ExtensionPage {
         return this.productsTab();
       case 'purchases':
         return this.purchasesTab();
+      case 'transfers':
+        return <TransfersTab onchange={() => this.loadOverview()} />;
       case 'coupons':
         return <CouponsTab products={this.products} />;
       case 'ads':
@@ -375,7 +381,7 @@ export default class KioskPage extends ExtensionPage {
 
   purchasesTab(): Mithril.Children {
     const statuses: Record<string, string> = { '': extractText(t('admin.purchases.all')) };
-    ['active', 'canceled', 'ended', 'refunded', 'pending', 'expired'].forEach((s) => (statuses[s] = extractText(t('lib.status.' + s))));
+    ['active', 'canceled', 'ended', 'refunded', 'awaiting', 'pending', 'expired'].forEach((s) => (statuses[s] = extractText(t('lib.status.' + s))));
 
     return (
       <div>
@@ -511,7 +517,70 @@ export default class KioskPage extends ExtensionPage {
         {this.paypalCard()}
         {this.stripeCard()}
         <CryptoCards status={{ btcpay: this.overview!.btcpay, nowpayments: this.overview!.nowpayments }} onchange={() => this.loadOverview()} />
+        {this.bankCard()}
       </div>
+    );
+  }
+
+  /** Bank transfer is on, or orders still wait on one: the queue tab shows. */
+  bankInUse(): boolean {
+    return !!this.setting('ernestdefoe-kiosk.bank_enabled')() || !!this.overview?.stats.awaitingTransfers || this.tab === 'transfers';
+  }
+
+  /** Manual bank transfer: the account buyers pay into, saved with the page's Save button. */
+  bankCard(): Mithril.Children {
+    const on = !!this.setting('ernestdefoe-kiosk.bank_enabled')();
+    const ready = on && String(this.setting('ernestdefoe-kiosk.bank_details')() || '').trim() !== '';
+
+    return (
+      <section className="KioskProvider KioskBank">
+        <header className="KioskProvider-head">
+          <Icon name="fas fa-building-columns" />
+          <h3>{t('admin.bank.title')}</h3>
+          <span className={classList('KioskStatus', ready ? 'KioskStatus--active' : 'KioskStatus--pending')}>
+            {t(ready ? 'admin.payments.connected' : 'admin.payments.not_connected')}
+          </span>
+        </header>
+        <p className="helpText">{t('admin.bank.help')}</p>
+        <div className="Form">
+          {this.buildSettingComponent({ setting: 'ernestdefoe-kiosk.bank_enabled', type: 'boolean', label: t('admin.bank.enable') })}
+          {on && !ready ? (
+            <p className="KioskWarning">
+              <Icon name="fas fa-triangle-exclamation" /> {t('admin.bank.not_ready')}
+            </p>
+          ) : null}
+          {this.buildSettingComponent({
+            setting: 'ernestdefoe-kiosk.bank_details',
+            type: 'textarea',
+            rows: 5,
+            label: t('admin.bank.details'),
+            help: t('admin.bank.details_help'),
+          })}
+          {this.buildSettingComponent({
+            setting: 'ernestdefoe-kiosk.bank_instructions',
+            type: 'textarea',
+            rows: 3,
+            label: t('admin.bank.instructions'),
+            help: t('admin.bank.instructions_help'),
+          })}
+          {this.buildSettingComponent({
+            setting: 'ernestdefoe-kiosk.bank_reference',
+            type: 'text',
+            placeholder: '{number}',
+            label: t('admin.bank.reference'),
+            help: t('admin.bank.reference_help'),
+          })}
+          {this.buildSettingComponent({
+            setting: 'ernestdefoe-kiosk.bank_expiry_days',
+            type: 'number',
+            min: 0,
+            max: 90,
+            label: t('admin.bank.expiry_days'),
+            help: t('admin.bank.expiry_days_help'),
+          })}
+          {this.submitButton()}
+        </div>
+      </section>
     );
   }
 
@@ -870,7 +939,7 @@ export default class KioskPage extends ExtensionPage {
 
   /** The Sellers tab's settings, saved with the page's own Save button. */
   sellerSettings(): Mithril.Children {
-    const keys = ['paypal', 'stripe', 'btcpay', 'nowpayments'];
+    const keys = ['paypal', 'stripe', 'btcpay', 'nowpayments', 'bank'];
     const chosen = String(this.setting('ernestdefoe-kiosk.seller_providers')() || '')
       .split(',')
       .filter(Boolean);

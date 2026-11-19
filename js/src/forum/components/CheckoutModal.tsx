@@ -57,9 +57,12 @@ export default class CheckoutModal extends FormModal<Attrs> {
             </label>
           </div>
         ) : null}
+        {this.provider === 'bank' ? <p className="helpText">{t('forum.checkout.bank_note')}</p> : null}
         <div className="Form-group">
           <Button type="submit" className="Button Button--primary Button--block" loading={this.loading} disabled={!!meta.termsUrl && !this.agreed}>
-            {t('forum.checkout.continue', { provider: t('lib.providers.' + this.provider) })}
+            {this.provider === 'bank'
+              ? t('forum.checkout.place_order')
+              : t('forum.checkout.continue', { provider: t('lib.providers.' + this.provider) })}
           </Button>
         </div>
       </div>

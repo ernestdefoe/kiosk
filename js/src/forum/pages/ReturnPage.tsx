@@ -11,6 +11,7 @@ import { t } from '../../common/t';
 import { date } from '../../common/money';
 import { confirm, purchase } from '../../common/api';
 import type { Purchase } from '../../common/api';
+import TransferPanel from '../components/TransferPanel';
 
 /**
  * /store/return/K-… — where PayPal sends the buyer back. It asks the server
@@ -19,7 +20,7 @@ import type { Purchase } from '../../common/api';
  */
 export default class ReturnPage extends Page {
   purchase: Purchase | null = null;
-  phase: 'checking' | 'done' | 'waiting' | 'cancelled' | 'failed' = 'checking';
+  phase: 'checking' | 'done' | 'waiting' | 'cancelled' | 'failed' | 'transfer' | 'transfer_canceled' = 'checking';
   tries = 0;
   timer = 0;
 
@@ -48,17 +49,25 @@ export default class ReturnPage extends Page {
     clearTimeout(this.timer);
   }
 
-  settle(p: Purchase) {
-    this.purchase = p;
-
-    if (p.status === 'active' || p.status === 'canceled') {
+  settle(p: Purchase | null) {
+    if (!p || (p.provider === 'bank' && p.status === 'expired')) {
+      // A bank transfer order called off: nothing to wait for.
+      this.phase = 'transfer_canceled';
+    } else if (p.status === 'awaiting') {
+      // Waiting for a bank transfer: days, not seconds. Show how to pay.
+      this.purchase = p;
+      this.phase = p.transfer ? 'transfer' : 'waiting';
+    } else if (p.status === 'active' || p.status === 'canceled') {
+      this.purchase = p;
       this.phase = 'done';
       // What they bought may have changed what they can see.
       app.store.find('users', String(app.session.user!.id()));
     } else if (this.tries++ < 15) {
+      this.purchase = p;
       this.phase = 'waiting';
       this.timer = window.setTimeout(() => purchase(p.number).then(({ data }) => this.settle(data)), 2000);
     } else {
+      this.purchase = p;
       this.phase = 'waiting';
     }
 
@@ -95,6 +104,23 @@ export default class ReturnPage extends Page {
           <p>{t('forum.return.failed_text')}</p>,
           <LinkButton className="Button" href={app.route('kiosk.purchases')}>
             {t('forum.purchases.title')}
+          </LinkButton>,
+        ];
+
+      case 'transfer':
+        return [
+          <TransferPanel purchase={p!} onchange={(next: Purchase | null) => this.settle(next)} />,
+          <LinkButton className="Button" href={app.route('kiosk.purchases')}>
+            {t('forum.purchases.title')}
+          </LinkButton>,
+        ];
+
+      case 'transfer_canceled':
+        return [
+          <h2>{t('forum.transfer.canceled_title')}</h2>,
+          <p>{t('forum.transfer.canceled_text')}</p>,
+          <LinkButton className="Button" href={app.route('kiosk.store')}>
+            {t('forum.return.back_to_store')}
           </LinkButton>,
         ];
 

@@ -27,6 +27,7 @@ class Sweeper
         private Fulfilment $fulfilment,
         private Providers $providers,
         private LoggerInterface $log,
+        private Transfers $transfers,
     ) {
     }
 
@@ -34,15 +35,20 @@ class Sweeper
     public function run(): array
     {
         $now = Carbon::now();
-        $out = ['closed' => 0, 'expired' => 0, 'ended' => 0, 'reminded' => 0, 'reconciled' => 0];
+        $out = ['closed' => 0, 'expired' => 0, 'ended' => 0, 'reminded' => 0, 'reconciled' => 0, 'transfers' => 0];
 
         $out['reconciled'] = $this->reconcile($now);
 
         $out['closed'] = $this->fulfilment->closeDue();
 
+        // Bank transfers nobody paid in the days the admin allows.
+        $out['transfers'] = $this->transfers->expireDue();
+
         // 🚨 A crypto payment can take hours to confirm: those wait two days.
+        // A bank transfer is only pending while Mark paid opens it.
         $abandoned = Purchase::query()
             ->where('status', Purchase::PENDING)
+            ->where('provider', '!=', \Ernestdefoe\Kiosk\Provider\Bank::KEY)
             ->where('created_at', '<', $now->copy()->subHours(self::ABANDONED_HOURS))
             ->where(fn ($q) => $q->whereNotIn('provider', ['btcpay', 'nowpayments'])->orWhere('created_at', '<', $now->copy()->subHours(48)))
             ->limit(500)->get(['id', 'coupon_code']);

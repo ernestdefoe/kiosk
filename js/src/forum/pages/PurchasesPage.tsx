@@ -79,7 +79,7 @@ export default class PurchasesPage extends Page {
 
   row(p: Purchase): Mithril.Children {
     return (
-      <li className={classList('KioskPurchase', { 'KioskPurchase--live': p.live })}>
+      <li className={classList('KioskPurchase', { 'KioskPurchase--live': p.live || p.status === 'awaiting' })}>
         <div className="KioskPurchase-main">
           <h3 className="KioskPurchase-name">{p.productName}</h3>
           <span className={'KioskStatus KioskStatus--' + (p.live ? 'live' : p.status)}>
@@ -91,6 +91,11 @@ export default class PurchasesPage extends Page {
           {this.when(p)}
         </p>
         {this.whose(p)}
+        {p.status === 'awaiting' && p.transfer ? (
+          <LinkButton className="Button Button--primary" icon="fas fa-building-columns" href={app.route('kiosk.return', { number: p.number })}>
+            {t('forum.transfer.how_to_pay')}
+          </LinkButton>
+        ) : null}
         {p.unlocks.length ? (
           <div className="KioskCard-unlocks">
             {p.unlocks.map((u) =>
@@ -245,6 +250,7 @@ export default class PurchasesPage extends Page {
   }
 
   when(p: Purchase): Mithril.Children {
+    if (p.status === 'awaiting') return p.transfer?.expiresAt ? t('forum.transfer.expires', { date: date(p.transfer.expiresAt) }) : null;
     if (!p.periodEnd) return t('forum.purchases.forever');
     if (!p.live) return t('forum.purchases.ended_on', { date: date(p.periodEnd) });
     if (p.kind === 'recurring' && p.status === 'active') return t('forum.purchases.renews_on', { date: date(p.periodEnd) });

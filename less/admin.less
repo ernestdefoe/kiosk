@@ -729,3 +729,55 @@ button.KioskTemplate {
     align-items: flex-start;
   }
 }
+
+// Bank transfers waiting
+code.KioskTransfers-reference {
+  font-weight: bold;
+  color: var(--text-color);
+  background: var(--control-bg);
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.KioskTransfers-note {
+  display: block;
+  max-width: 260px;
+  color: var(--muted-color);
+  overflow-wrap: anywhere;
+}
+.KioskBank textarea.FormControl {
+  font-family: inherit;
+}
+
+// Phones: each order waiting is a card, its buttons in reach (no sideways table).
+@media (max-width: 767px) {
+  .KioskTransfers .KioskTable {
+    thead {
+      display: none;
+    }
+    tbody,
+    tr,
+    td {
+      display: block;
+    }
+    tr {
+      padding: 12px 0;
+      border-bottom: 1px solid var(--control-bg);
+    }
+    td {
+      padding: 2px 0;
+      border: 0;
+    }
+    td[data-label]::before {
+      content: attr(data-label) ': ';
+      color: var(--muted-color);
+      font-weight: bold;
+    }
+    .KioskTable-actions {
+      padding-top: 8px;
+    }
+  }
+  .KioskTransfers .KioskTableWrap {
+    overflow: visible;
+  }
+}

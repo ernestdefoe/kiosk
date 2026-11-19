@@ -58,7 +58,7 @@ class OverviewController implements RequestHandlerInterface
             ->toBase()->selectRaw('currency, SUM(amount_cents) as total, COUNT(*) as n')->groupBy('currency')->get();
 
         $hasProduct = Product::query()->where('is_active', true)->exists();
-        $hasSale = Purchase::query()->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED])->where('provider', '!=', Purchase::GRANT)->exists();
+        $hasSale = Purchase::query()->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED, Purchase::AWAITING])->where('provider', '!=', Purchase::GRANT)->exists();
 
         return new JsonResponse(['data' => [
             'paypal' => self::paypalStatus($this->paypal, $this->settings),
@@ -78,6 +78,8 @@ class OverviewController implements RequestHandlerInterface
                 'activeSubscriptions' => (int) (clone $live)->where('status', Purchase::ACTIVE)->where('kind', Price::RECURRING)->count(),
                 'mrr' => $mrr,
                 'thisMonth' => $month->map(fn ($r) => ['currency' => $r->currency, 'totalCents' => (int) $r->total, 'count' => (int) $r->n])->values()->all(),
+                // Bank transfers waiting for someone to see the money arrive.
+                'awaitingTransfers' => Purchase::query()->where('status', Purchase::AWAITING)->count(),
                 'failedWebhooks' => WebhookEvent::query()->whereNotNull('error')->whereNull('processed_at')->count(),
             ],
             'unlockTypes' => $this->presenter->unlockTypes(),

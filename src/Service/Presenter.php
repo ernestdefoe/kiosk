@@ -21,8 +21,12 @@ use Illuminate\Support\Collection;
  */
 class Presenter
 {
-    public function __construct(private Registry $types, private TranslatorInterface $translator, private ConnectionInterface $db)
-    {
+    public function __construct(
+        private Registry $types,
+        private TranslatorInterface $translator,
+        private ConnectionInterface $db,
+        private \Ernestdefoe\Kiosk\Provider\Providers $providers,
+    ) {
     }
 
     /**
@@ -146,6 +150,10 @@ class Presenter
             'createdAt' => $p->created_at?->toIso8601String(),
             'paidAt' => $p->paid_at?->toIso8601String(),
             'canCancel' => $p->isRecurring() && $p->status === Purchase::ACTIVE && $p->provider !== Purchase::GRANT,
+            // Waiting for a bank transfer: how to pay, for the payer; the reference and proof, for the admin.
+            'transfer' => $p->status === Purchase::AWAITING && ($admin || ($viewer && $p->payerId() === (int) $viewer->id))
+                ? $this->transfer($p, ! $admin)
+                : null,
             'unlocks' => $p->entitlements->where('user_id', $p->user_id)->map(fn (Entitlement $e) => [
                 'type' => $e->type,
                 'targetId' => $e->target_id,
@@ -171,6 +179,27 @@ class Presenter
                 'email' => $p->user->email,
             ] : null,
         ] : []))->values()->all();
+    }
+
+    /**
+     * An order waiting for a bank transfer. The account to pay into goes to
+     * its payer only (never into a list anyone else reads).
+     *
+     * @return array<string, mixed>
+     */
+    public function transfer(Purchase $p, bool $payer): array
+    {
+        $bank = $payer ? $this->providers->forPurchase($p) : null;
+
+        return [
+            'reference' => $p->provider_ref,
+            'expiresAt' => $p->expires_at?->toIso8601String(),
+            'proof' => $p->proof_at ? [
+                'file' => $p->proof_path ? ($p->proof_type === 'application/pdf' ? 'pdf' : 'image') : null,
+                'note' => $p->proof_note,
+                'at' => $p->proof_at->toIso8601String(),
+            ] : null,
+        ] + ($bank instanceof \Ernestdefoe\Kiosk\Provider\Bank ? $bank->payTo() : []);
     }
 
     /**

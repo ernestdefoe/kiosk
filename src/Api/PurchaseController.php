@@ -55,6 +55,9 @@ class PurchaseController implements RequestHandlerInterface
                 ->where(fn ($q) => $q->where('user_id', $actor->id)->orWhere('gifted_by', $actor->id)
                     ->orWhereIn('id', fn ($s) => $s->select('purchase_id')->from('kiosk_seats')->where('user_id', $actor->id)))
                 ->whereNotIn('status', [Purchase::PENDING, Purchase::EXPIRED])
+                // An order waiting for a transfer is the payer's to see (not a gift's recipient, yet).
+                ->where(fn ($q) => $q->where('status', '!=', Purchase::AWAITING)->orWhere('gifted_by', $actor->id)
+                    ->orWhere(fn ($own) => $own->whereNull('gifted_by')->where('user_id', $actor->id)))
                 ->with(['entitlements', 'payments'])
                 ->orderByDesc('id')
                 ->limit(200)

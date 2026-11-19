@@ -643,3 +643,149 @@ span.KioskChip,
   white-space: normal;
   text-align: left;
 }
+
+// ─── Bank transfer: the payer's order page ───────────────────────────────
+.KioskReturn .KioskTransfer {
+  text-align: left;
+  margin: 0 0 20px;
+  padding: 20px;
+  border: 1px solid var(--control-bg);
+  border-radius: var(--border-radius, 6px);
+  background: var(--body-bg);
+  color: var(--text-color);
+
+  h2.KioskTransfer-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 8px;
+    font-size: 18px;
+    color: var(--text-color);
+  }
+  h3 {
+    margin: 0 0 4px;
+    font-size: 15px;
+    color: var(--text-color);
+  }
+  p {
+    color: var(--text-color);
+  }
+  .helpText {
+    color: var(--muted-color);
+  }
+  .Button {
+    margin: 0;
+  }
+}
+.KioskTransfer-facts {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 16px 0;
+  padding: 16px;
+  border-radius: var(--border-radius, 6px);
+  background: var(--control-bg);
+
+  dt {
+    font-weight: bold;
+    color: var(--muted-color);
+  }
+  dd {
+    margin: 0;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: var(--text-color);
+  }
+  small.helpText {
+    display: block;
+    margin-top: 4px;
+  }
+}
+.KioskTransfer-amount {
+  font-size: 18px;
+  font-weight: bold;
+}
+.KioskTransfer-details,
+.KioskReturn p.KioskTransfer-instructions {
+  white-space: pre-line;
+}
+code.KioskTransfer-reference {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: bold;
+  background: var(--body-bg);
+  color: var(--text-color);
+  user-select: all;
+}
+.KioskReturn p.KioskTransfer-deadline {
+  font-weight: bold;
+}
+.KioskTransfer-proof {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--control-bg-shaded, var(--muted-more-color));
+
+  .KioskTransfer-label {
+    display: block;
+    margin-bottom: 10px;
+    font-weight: bold;
+    color: var(--text-color);
+
+    .FormControl,
+    input[type='file'] {
+      display: block;
+      width: 100%;
+      margin-top: 4px;
+      font-weight: normal;
+    }
+    input[type='file'] {
+      color: var(--text-color);
+    }
+  }
+}
+html:not(#x-hi) .KioskTransfer a:not(.Button) {
+  color: var(--primary-color);
+}
+.KioskTransfer .KioskSuccess {
+  padding: 8px 12px;
+  border-radius: var(--border-radius, 6px);
+  background: var(--control-bg);
+  color: var(--text-color);
+
+  .icon {
+    color: var(--success-color, #2e7d32);
+  }
+}
+.KioskReturn .Button.KioskTransfer-cancel {
+  margin-top: 12px;
+}
+.KioskStatus--awaiting {
+  background: var(--body-bg);
+  color: var(--text-color);
+}
+.KioskSelling-awaiting .KioskPurchase-terms code {
+  font-weight: bold;
+  color: var(--text-color);
+  background: var(--control-bg);
+  padding: 0 4px;
+  border-radius: 3px;
+}
+.KioskSelling-fields textarea.FormControl {
+  min-height: 70px;
+}
+
+@media (max-width: 767px) {
+  .KioskReturn .KioskTransfer {
+    padding: 15px;
+  }
+  .KioskTransfer-facts {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+
+    dd + dt {
+      margin-top: 8px;
+    }
+  }
+}

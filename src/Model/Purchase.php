@@ -42,6 +42,12 @@ use Illuminate\Support\Str;
  * @property int $seats
  * @property int|null $seller_id
  * @property int|null $seller_account_id
+ * @property Carbon|null $expires_at when an order awaiting a bank transfer cancels itself
+ * @property string|null $proof_path
+ * @property string|null $proof_type
+ * @property string|null $proof_note
+ * @property Carbon|null $proof_at
+ * @property bool $stock_held whether a unit of the product's stock is held for this order
  * @property-read User|null $user
  * @property-read Product|null $product
  * @property-read Price|null $price
@@ -58,6 +64,8 @@ class Purchase extends AbstractModel
     /** Checkout started and never finished. */
     public const EXPIRED = 'expired';
     public const REFUNDED = 'refunded';
+    /** Paid by bank transfer: waits for the admin or seller to see the money arrive. */
+    public const AWAITING = 'awaiting';
 
     public const GRANT = 'grant';
 
@@ -80,6 +88,9 @@ class Purchase extends AbstractModel
         'paid_at' => 'datetime',
         'ended_at' => 'datetime',
         'reminded_at' => 'datetime',
+        'expires_at' => 'datetime',
+        'proof_at' => 'datetime',
+        'stock_held' => 'bool',
     ];
 
     /** A new purchase with the price's terms copied in. */
@@ -139,6 +150,12 @@ class Purchase extends AbstractModel
     public function entitlements(): HasMany
     {
         return $this->hasMany(Entitlement::class);
+    }
+
+    /** Who pays: the giver of a gift, else the owner. Bank details and the order's proof are theirs. */
+    public function payerId(): int
+    {
+        return (int) ($this->gifted_by ?: $this->user_id);
     }
 
     public function isRecurring(): bool

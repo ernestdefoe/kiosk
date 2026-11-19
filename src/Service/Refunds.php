@@ -27,7 +27,9 @@ class Refunds
 
         // Paid to a member's PayPal email: the money is in their PayPal, so they
         // refund it there and this records it (and ends the buyer's access).
-        $byEmail = $provider instanceof \Ernestdefoe\Kiosk\Provider\PayPal && $provider->paysByEmail();
+        // A bank transfer is sent back from the bank the same way.
+        $byEmail = ($provider instanceof \Ernestdefoe\Kiosk\Provider\PayPal && $provider->paysByEmail())
+            || $provider instanceof \Ernestdefoe\Kiosk\Provider\Bank;
 
         if (! $byEmail && ! $provider->refund($payment)) {
             // Crypto can only be sent back from the gateway itself.

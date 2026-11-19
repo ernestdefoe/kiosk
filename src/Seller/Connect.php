@@ -197,6 +197,25 @@ class Connect
         return $this->connected($account);
     }
 
+    /**
+     * Paid by bank transfer: the account the member's buyers pay into, and
+     * what to tell them. Sealed like any secret, shown only to the buyer of
+     * one of their orders. One-time prices only; the member marks sales paid.
+     */
+    public function bank(User $seller, string $details, string $instructions): Account
+    {
+        $details = mb_substr(trim($details), 0, 1000);
+        if ($details === '') {
+            throw $this->invalid('details', 'bank_details');
+        }
+
+        $account = $this->account($seller, 'bank');
+        $account->setCredentials(['details' => $details, 'instructions' => mb_substr(trim($instructions), 0, 1000)]);
+        $account->details = ['hint' => $this->translator->trans('ernestdefoe-kiosk.forum.selling.bank_hint')];
+
+        return $this->connected($account);
+    }
+
     /** Remove a payout account. Their listings stop selling through it; buyers keep what they bought. */
     public function remove(User $seller, string $provider): void
     {
@@ -208,6 +227,12 @@ class Connect
             ->where('kind', \Ernestdefoe\Kiosk\Model\Price::RECURRING)
             ->whereIn('status', [\Ernestdefoe\Kiosk\Model\Purchase::ACTIVE, \Ernestdefoe\Kiosk\Model\Purchase::CANCELED])->exists()) {
             throw $this->invalid('provider', 'has_subscriptions');
+        }
+
+        // Buyers are paying into it now: settle those orders first.
+        if (\Ernestdefoe\Kiosk\Model\Purchase::query()->whereIn('seller_account_id', $accounts->pluck('id'))
+            ->where('status', \Ernestdefoe\Kiosk\Model\Purchase::AWAITING)->exists()) {
+            throw $this->invalid('provider', 'has_transfers');
         }
 
         foreach ($accounts as $account) {

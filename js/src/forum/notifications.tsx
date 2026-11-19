@@ -17,12 +17,17 @@ export class PurchaseNotification extends Notification {
         ended: 'fas fa-lock',
         gift: 'fas fa-gift',
         seat: 'fas fa-users',
+        awaiting: 'fas fa-building-columns',
+        transfer_canceled: 'fas fa-ban',
+        transfer_expired: 'fas fa-ban',
       }[this.kind()] || 'fas fa-store'
     );
   }
 
   href() {
-    return app.route('kiosk.purchases');
+    // An order waiting for a bank transfer: straight to how to pay it.
+    const number = (this.attrs.notification.content() as any)?.number;
+    return number ? app.route('kiosk.return', { number }) : app.route('kiosk.purchases');
   }
 
   content() {

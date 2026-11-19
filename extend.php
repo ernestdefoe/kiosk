@@ -125,6 +125,11 @@ return [
     new Kiosk\Provider('stripe', Stripe::class),
     new Kiosk\Provider('btcpay', \Ernestdefoe\Kiosk\Provider\BTCPay::class),
     new Kiosk\Provider('nowpayments', \Ernestdefoe\Kiosk\Provider\NOWPayments::class),
+    // Manual bank transfer: the order waits until someone sees the money arrive.
+    new Kiosk\Provider('bank', \Ernestdefoe\Kiosk\Provider\Bank::class),
+
+    // Buyers' proofs of payment: under storage/, never served from the web root.
+    (new Extend\Filesystem())->disk('ernestdefoe-kiosk-proofs', fn (\Flarum\Foundation\Paths $paths) => ['root' => $paths->storage.'/kiosk/proofs']),
 
     (new Extend\Conditional())->whenExtensionEnabled('flarum-tags', fn () => [
         new Kiosk\UnlockType('tag', TagUnlock::class),
@@ -168,6 +173,12 @@ return [
         ->post('/kiosk/purchases/{number}/switch', 'kiosk.purchases.switch', Api\PurchaseController::class)
         ->post('/kiosk/purchases/{number}/seats', 'kiosk.purchases.seats.add', Api\PurchaseController::class)
         ->delete('/kiosk/purchases/{number}/seats/{userId:[0-9]+}', 'kiosk.purchases.seats.remove', Api\PurchaseController::class)
+        // Bank transfers: the admin's queue, Mark paid, Cancel, and the buyer's proof.
+        ->get('/kiosk/admin/transfers', 'kiosk.admin.transfers', Api\Admin\TransfersController::class)
+        ->post('/kiosk/transfers/{number}/paid', 'kiosk.transfers.paid', Api\Transfer\MarkPaidController::class)
+        ->post('/kiosk/transfers/{number}/cancel', 'kiosk.transfers.cancel', Api\Transfer\CancelController::class)
+        ->post('/kiosk/transfers/{number}/proof', 'kiosk.transfers.proof.upload', Api\Transfer\UploadProofController::class)
+        ->get('/kiosk/transfers/{number}/proof', 'kiosk.transfers.proof', Api\Transfer\ShowProofController::class)
         ->post('/kiosk/coupons/check', 'kiosk.coupons.check', Api\CouponController::class)
         ->post('/kiosk/webhooks/{provider:[a-z]+}', 'kiosk.webhooks', Api\WebhookController::class)
         ->post('/kiosk/webhooks/{provider:[a-z]+}/{account:[0-9]+}', 'kiosk.webhooks.seller', Api\WebhookController::class)
@@ -242,9 +253,13 @@ return [
 
     (new Extend\Settings())
         ->default('ernestdefoe-kiosk.grace_days', 3)
-        ->default(\Ernestdefoe\Kiosk\Seller\Sellers::ENABLED, false)
-        ->default(\Ernestdefoe\Kiosk\Seller\Fees::PERCENT, 0)
-        ->serializeToForum('kioskSellers', \Ernestdefoe\Kiosk\Seller\Sellers::ENABLED, 'boolval')
+        // Bank transfer (never sent to the forum: the details reach only an order's buyer).
+        ->default('ernestdefoe-kiosk.bank_enabled', false)
+        ->default('ernestdefoe-kiosk.bank_reference', '{number}')
+        ->default('ernestdefoe-kiosk.bank_expiry_days', 7)
+        ->default('ernestdefoe-kiosk.sellers', false)
+        ->default('ernestdefoe-kiosk.seller_fee_percent', 0)
+        ->serializeToForum('kioskSellers', 'ernestdefoe-kiosk.sellers', 'boolval')
         ->default('ernestdefoe-kiosk.show_nav', true)
         ->default('ernestdefoe-kiosk.ads_every_posts', 5)
         ->default('ernestdefoe-kiosk.ads_every_discussions', 10)

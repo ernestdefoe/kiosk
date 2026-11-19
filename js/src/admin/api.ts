@@ -42,6 +42,7 @@ export interface Overview {
     mrr: Record<string, number>;
     thisMonth: { currency: string; totalCents: number; count: number }[];
     failedWebhooks: number;
+    awaitingTransfers: number;
   };
   unlockTypes: UnlockType[];
 }
@@ -155,3 +156,8 @@ export type Listing = import('../common/api').Listing;
 export const listings = (all = false) => call<{ data: Listing[] }>('GET', '/admin/listings', undefined, all ? { review: 'all' } : undefined);
 export const reviewListing = (id: number, action: 'approve' | 'reject', note = '') =>
   call<{ data: Listing[] }>('POST', `/admin/listings/${id}`, { action, note });
+
+/** An order waiting for a bank transfer, in the admin's queue. */
+export type AwaitingTransfer = Purchase & { seller: { username: string; displayName: string } | null };
+
+export const awaitingTransfers = () => call<{ data: AwaitingTransfer[] }>('GET', '/admin/transfers');

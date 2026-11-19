@@ -41,11 +41,12 @@ A price can also be a **team plan**: give it more than one seat, and the buyer h
 - **Plan switching**: Stripe switches at once and settles the difference on the next bill; PayPal asks the buyer to approve, and the next bill is at the new price.
 - **An admin page** with a setup checklist, sales numbers, products (drag to order), purchases (grant, cancel, end, refund), coupons, payment providers, a log of every notification the providers sent (with Run again), and settings.
 - **Sell this** buttons on the group, tag and other extensions' edit screens.
-- **Receipts and reminders** in the bell and by email: purchase complete, a gift, a seat, a renewal coming up, a failed payment, access ended.
+- **Bank transfer**: buyers pay from their own bank and the order waits until you mark it paid (see below).
+- **Receipts and reminders** in the bell and by email: purchase complete, a gift, a seat, a renewal coming up, a failed payment, access ended, how to pay a bank transfer.
 - **Grace days**: a renewal that is a day or two late doesn't lock a paying member out.
 - **Ads**: your own ads in nine spots, with Remove ads for sale (see below).
 - **Moving from floxum/payments**: `php flarum kiosk:import-floxum` (see below).
-- Translatable, works in light and dark mode, and adds about 8 KB (gzipped) to the JavaScript every page loads. The store pages load only when opened.
+- Translatable, works in light and dark mode, and adds about 9 KB (gzipped) to the JavaScript every page loads. The store pages load only when opened.
 
 ## Screenshots
 
@@ -97,7 +98,7 @@ php flarum cache:clear
 
 ## Payment providers
 
-All of them need your forum on a public `https://` address, so the provider can tell Kiosk about payments.
+All of them except bank transfer need your forum on a public `https://` address, so the provider can tell Kiosk about payments.
 
 ### PayPal
 
@@ -119,6 +120,17 @@ Copy your **secret key** from [Stripe's API keys page](https://dashboard.stripe.
 Crypto can't renew by itself, so it is offered for one-time and set-time prices only (add a 30-day price for crypto payers if you sell subscriptions). Refunds are sent from the gateway's own dashboard; then press **End** on the purchase.
 
 > **Crypto hasn't been tested with real payments yet.** It is covered by automated tests against each gateway's documented API. Please [report anything that goes wrong](https://github.com/ernestdefoe/kiosk/issues).
+
+### Bank transfer
+
+For buyers who pay from their own bank, by mobile or internet banking. In Kiosk → Payments → **Bank transfer**, turn on **Offer bank transfer at checkout** and enter your bank account details and any instructions. Then:
+
+- At checkout the buyer chooses **Bank transfer** and lands on their order page: the amount, your account, and a reference to put on the transfer (the order number, or your own format with `{number}` and `{id}`). They get the same in an email.
+- The order waits as **Awaiting payment**. The buyer can attach a proof of payment (a picture or PDF, up to 5 MB, kept privately) and a note, or cancel it.
+- When the money arrives, find the reference on the **Bank transfers** tab and press **Mark paid**: the buyer gets what they ordered at once, exactly as with any other payment, and is told. Pressing it twice opens it once.
+- An order nobody pays is canceled after the days you set (7 by default, 0 for never). Stock is held for the buyer while they pay, and freed when an order is canceled.
+
+Your account details are shown only to the buyer of an order (and to admins), never to anyone else. One-time and set-time prices only: a transfer can't renew by itself. Sellers can be paid by bank transfer too, into their own account, and mark their own orders paid on their Selling page. To refund a transfer, send the money back from your bank, then press **Refund** on the purchase.
 
 ## Ads
 
