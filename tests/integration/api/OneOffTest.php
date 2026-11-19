@@ -17,6 +17,30 @@ class OneOffTest extends KioskTestCase
     }
 
     #[Test]
+    public function the_buyers_notifications_load_and_the_purchase_shows_only_its_number_and_name(): void
+    {
+        $product = $this->product([['type' => 'group', 'targetId' => self::GOLD]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);
+        $number = $this->json($this->api('POST', '/kiosk/checkout', self::BUYER, ['priceId' => $product['prices'][0]['id'], 'provider' => 'paypal']))['data']['number'];
+        $this->api('POST', '/kiosk/purchases/'.$number.'/confirm', self::BUYER);
+
+        $r = $this->api('GET', '/notifications', self::BUYER);
+        $this->assertSame(200, $r->getStatusCode(), (string) $r->getBody());
+        $doc = $this->json($r);
+
+        $kinds = array_map(fn ($n) => $n['attributes']['contentType'], $doc['data']);
+        $this->assertContains('kioskPurchase', $kinds);
+
+        // The subject the forum must have a model for (forum/models/Purchase): number and name only.
+        $subjects = array_values(array_filter($doc['included'] ?? [], fn ($i) => $i['type'] === 'kiosk-purchases'));
+        $this->assertNotEmpty($subjects);
+        $this->assertSame(['number', 'productName'], array_keys($subjects[0]['attributes']));
+        $this->assertSame($number, $subjects[0]['attributes']['number']);
+
+        // Nobody else is told about it.
+        $this->assertNotContains('kioskPurchase', array_map(fn ($n) => $n['attributes']['contentType'], $this->json($this->api('GET', '/notifications', 2))['data']));
+    }
+
+    #[Test]
     public function buying_a_group_grants_it_once_and_records_the_payment(): void
     {
         $product = $this->product([['type' => 'group', 'targetId' => self::GOLD]], [['kind' => 'one_off', 'amount' => '5.00', 'currency' => 'USD']]);

@@ -10,6 +10,7 @@ import teaser from './teaser';
 import tagActions from './tagActions';
 import ads from './ads';
 
+export { default as extend } from './extend';
 export { default as ProductCard } from './components/ProductCard';
 export { default as LockedNotice } from './components/LockedNotice';
 
